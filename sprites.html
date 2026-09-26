@@ -35,10 +35,8 @@
 <div id="font" class="grid"></div>
 <script src="src/palette.js"></script>
 <script src="src/sprites.js"></script>
-<script src="src/art/megaman.js"></script>
-<script src="src/art/enemies.js"></script>
-<script src="src/art/cutman.js"></script>
-<script src="src/art/effects.js"></script>
+<script src="src/art/originals.js"></script>
+<script src="src/art/timberman.js"></script>
 <script src="src/art/tiles.js"></script>
 <script src="src/art/font.js"></script>
 <script>
@@ -52,30 +50,30 @@ let tick = 0;
 const animations = [
   { label: 'Parado / piscando', fps: 8, frames: [...Array(14).fill('megaStand'), 'megaBlink'] },
   { label: 'Passinho', fps: 4, frames: ['megaStand', 'megaStep'] },
-  { label: 'Correndo', fps: 8, frames: ['megaRun1', 'megaRun2', 'megaRun3', 'megaRun2'] },
-  { label: 'Correndo atirando', fps: 8, frames: ['megaRunShoot1', 'megaRunShoot2', 'megaRunShoot3', 'megaRunShoot2'] },
+  { label: 'Correndo', fps: 8, frames: ['megaRun1', 'megaRun2', 'megaRun3', 'megaRun4'] },
+  { label: 'Correndo atirando', fps: 8, frames: ['megaRunShoot1', 'megaRunShoot2', 'megaRunShoot3', 'megaRunShoot4'] },
   { label: 'Pulo / tiro', fps: 2, frames: ['megaJump', 'megaJumpShoot'] },
   { label: 'Escada', fps: 6, frames: [{ sprite: 'megaClimb' }, { sprite: 'megaClimb', flip: true }] },
   { label: 'Topo da escada / tiro', fps: 2, frames: ['megaClimbTop', 'megaClimbShoot'] },
   { label: 'Slide', fps: 1, frames: ['megaSlide'] },
-  { label: 'Dano', fps: 10, frames: [{ sprite: 'megaHurt', overlay: 'hurtSpark1' }, { sprite: 'megaHurt', overlay: 'hurtSpark2' }] },
-  { label: 'Teleporte', fps: 10, frames: ['megaBeam', 'megaBeam', 'megaBeam', 'megaTeleportA', 'megaTeleportB', 'megaTeleportA', 'megaTeleportB', 'megaStand', 'megaStand', 'megaStand', 'megaStand'] },
+  { label: 'Dano', fps: 10, frames: [{ sprite: 'megaHurt', overlay: 'megaHitStar' }, { sprite: 'megaHurt' }] },
+  { label: 'Teleporte', fps: 10, frames: ['megaBeam', 'megaBeam', 'megaBeam', 'megaTeleportB', 'megaTeleportA', 'megaStand', 'megaStand', 'megaStand'] },
   { label: 'Carga media', fps: 8, frames: [{ sprite: 'megaStand', palette: 'mega' }, { sprite: 'megaStand', palette: 'megaCharge1' }] },
   { label: 'Carga total', fps: 20, frames: [{ sprite: 'megaStand', palette: 'megaCharge2' }, { sprite: 'megaStand', palette: 'megaCharge3' }, { sprite: 'megaStand', palette: 'mega' }] },
-  { label: 'Arma Rolling Cutter', fps: 6, frames: [{ sprite: 'megaShoot', palette: 'mega' }, { sprite: 'megaShoot', palette: 'megaCutter' }] },
-  { label: 'Cut Man correndo', fps: 8, frames: ['cutRun1', 'cutRun2', 'cutRun3', 'cutRun2'].map(sprite => ({ sprite, palette: 'cutMan' })) },
-  { label: 'Cut Man arremesso', fps: 4, frames: ['cutStand', 'cutThrow', 'cutThrowX', 'cutStandX', 'cutJumpX', 'cutJump'].map(sprite => ({ sprite, palette: 'cutMan' })) },
-  { label: 'Rolling Cutter', fps: 15, frames: ['cutter0', 'cutter1', 'cutter2', 'cutter3'].map(sprite => ({ sprite, palette: 'cutMan' })) },
+  { label: 'Arma Timber Axe', fps: 6, frames: [{ sprite: 'megaShoot', palette: 'mega' }, { sprite: 'megaShoot', palette: 'megaTimber' }] },
+  { label: 'Timber Man correndo', fps: 6, frames: ['timberRun1', 'timberRun2'].map(sprite => ({ sprite, palette: 'boss' })) },
+  { label: 'Timber Man arremesso', fps: 4, frames: ['timberStand', 'timberPose', 'timberThrow', 'timberStandX', 'timberJumpX', 'timberJump'].map(sprite => ({ sprite, palette: 'boss' })) },
+  { label: 'Timber Axe', fps: 15, frames: ['axe0', 'axe1', 'axe2', 'axe3'].map(sprite => ({ sprite, palette: 'boss' })) },
   { label: 'Met', fps: 2, frames: ['metHide', 'metHide', 'metOpen', 'metOpen'] },
   { label: 'Blader', fps: 15, frames: ['blader1', 'blader2'] },
-  { label: 'Screw Bomber', fps: 10, frames: ['screwClosed', 'screwClosed', 'screwClosed', 'screwOpen1', 'screwOpen2', 'screwOpen1', 'screwOpen2'] },
-  { label: 'Blaster', fps: 2, frames: ['blasterClosed', 'blasterOpen'] },
-  { label: 'Big Eye', fps: 2, frames: ['bigEyeStand', 'bigEyeJump'] },
-  { label: 'Tiro / carga', fps: 10, frames: ['busterShot', 'busterShot', 'chargeMid1', 'chargeMid2', 'chargeFull1', 'chargeFull2'] },
-  { label: 'Explosao', fps: 12, frames: ['explode1', 'explode2', 'explode3', 'explode4', 'explode4'] },
+  { label: 'Screw Bomber', fps: 10, frames: ['screw0', 'screw0', 'screw1', 'screw2', 'screw3', 'screw4', 'screw2', 'screw3', 'screw4', 'screw1'] },
+  { label: 'Beak', fps: 6, frames: ['beak0', 'beak0', 'beak1', 'beak2', 'beak3', 'beak3', 'beak2', 'beak1'] },
+  { label: 'Big Eye', fps: 3, frames: ['bigEye0', 'bigEye1', 'bigEye2', 'bigEye3', 'bigEye4'] },
+  { label: 'Tiro / carga', fps: 10, frames: ['busterShot', 'busterShot', 'chargeMid1', 'chargeMid2', 'chargeFull1', 'chargeFull2', 'chargeFull3', 'chargeFull4'] },
+  { label: 'Explosao', fps: 12, frames: ['explode1', 'explode2', 'explode3', 'explode4', 'explode5'] },
   { label: 'Orbes de morte', fps: 16, frames: ['orbSmall', 'orbBig1', 'orbBig2', 'orbBig1'] },
-  { label: 'Orbes Cut Man', fps: 16, frames: ['orbSmall', 'orbBig1', 'orbBig2', 'orbBig1'].map(sprite => ({ sprite, palette: 'orbCut' })) },
-  { label: 'Poeira', fps: 10, frames: ['dust1', 'dust2', 'dust3'] },
+  { label: 'Orbes do chefe', fps: 16, frames: ['orbSmall', 'orbBig1', 'orbBig2', 'orbBig1'].map(sprite => ({ sprite, palette: 'orbBoss' })) },
+  { label: 'Suor / poeira', fps: 8, frames: ['megaSweat1', 'megaSweat2', 'megaSweat3', 'dust1', 'dust2', 'dust3'] },
   { label: 'Energia', fps: 6, frames: ['energySmall1', 'energySmall2', 'energyBig1', 'energyBig2', 'energyBig1', 'energyBig2'] },
 ];
 
@@ -83,7 +81,7 @@ const animations = [
 
 function spritePaletteFor(name) {
   if (name.startsWith('mega') || name === 'oneUp') return 'mega';
-  if (name.startsWith('cut')) return 'cutMan';
+  if (name.startsWith('timber') || name.startsWith('axe')) return 'boss';
   return 'enemy';
 }
 
@@ -177,7 +175,7 @@ function renderAll() {
 
 // INITIALIZATION
 
-for (const group of [megaArt, enemyArt, bossArt, effectArt, itemArt, tileArt]) defineSprites(group);
+for (const group of [megaArtOriginals, effectArtOriginals, itemArtOriginals, enemyArtOriginals, tileArt, tileArtOriginals, bossArt]) defineSprites(group);
 zoomInput.addEventListener('input', renderAll);
 lightInput.addEventListener('change', renderAll);
 renderAll();

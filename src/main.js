@@ -32,7 +32,7 @@ function frame(time) {
 
 // INITIALIZATION
 
-for (const group of [megaArt, enemyArt, bossArt, effectArt, itemArt, tileArt]) defineSprites(group);
+for (const group of [megaArtOriginals, effectArtOriginals, itemArtOriginals, enemyArtOriginals, tileArt, tileArtOriginals, bossArt]) defineSprites(group);
 buildLevel();
 makeStars();
 ctx.imageSmoothingEnabled = false;

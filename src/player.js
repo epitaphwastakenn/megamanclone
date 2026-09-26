@@ -110,10 +110,8 @@ function updateTeleport() {
       return;
     }
     player.y = tp.groundY;
-    if (tp.timer < 4) player.pose = 'megaTeleportA';
-    else if (tp.timer < 8) player.pose = 'megaTeleportB';
-    else if (tp.timer < 12) player.pose = 'megaTeleportA';
-    else if (tp.timer < 16) player.pose = 'megaTeleportB';
+    if (tp.timer < 4) player.pose = 'megaTeleportB';
+    else if (tp.timer < 8) player.pose = 'megaTeleportA';
     else {
       player.pose = 'megaStand';
       player.teleport = null;
@@ -123,10 +121,8 @@ function updateTeleport() {
     return;
   }
   if (tp.timer === 1) playSfx('teleportOut');
-  if (tp.timer < 5) player.pose = 'megaTeleportB';
-  else if (tp.timer < 9) player.pose = 'megaTeleportA';
-  else if (tp.timer < 13) player.pose = 'megaTeleportB';
-  else if (tp.timer < 17) player.pose = 'megaTeleportA';
+  if (tp.timer < 5) player.pose = 'megaTeleportA';
+  else if (tp.timer < 9) player.pose = 'megaTeleportB';
   else {
     player.pose = 'megaBeam';
     player.y -= 8;
@@ -407,7 +403,7 @@ function autoWalk(dx) {
   player.x += dx;
   player.stepTimer = 8;
   player.runTimer++;
-  player.pose = ['megaRun1', 'megaRun2', 'megaRun3', 'megaRun2'][Math.floor(player.runTimer / 7) % 4];
+  player.pose = 'megaRun' + (1 + (Math.floor(player.runTimer / 7) % 4));
 }
 
 function choosePlayerPose() {
@@ -433,7 +429,7 @@ function choosePlayerPose() {
   const moving = input.held.left !== input.held.right && player.control;
   if (moving && player.stepTimer >= 8) {
     player.runTimer++;
-    const index = [1, 2, 3, 2][Math.floor(player.runTimer / 7) % 4];
+    const index = 1 + (Math.floor(player.runTimer / 7) % 4);
     player.pose = (shooting ? 'megaRunShoot' : 'megaRun') + index;
     return;
   }
@@ -466,7 +462,8 @@ function drawPlayer(ctx) {
   if (player.pose === 'megaClimbTop' || player.pose === 'megaBeam' || player.pose.startsWith('megaTeleport')) flip = false;
   drawSprite(ctx, player.pose, screenX, screenY, flip, playerPalette());
   if (player.hurtTimer > 0) {
-    const spark = Math.floor(player.hurtTimer / 3) % 2 ? 'hurtSpark1' : 'hurtSpark2';
-    if (player.hurtTimer > 8) drawSprite(ctx, spark, screenX, screenY - 10, false, 'enemy');
+    if (player.hurtTimer > 16 && Math.floor(player.hurtTimer / 2) % 2 === 0) drawSprite(ctx, 'megaHitStar', screenX, screenY - 12, false, 'enemy');
+    const sweat = 'megaSweat' + (1 + (Math.floor((playerStats.hurtFrames - player.hurtTimer) / 6) % 3));
+    drawSprite(ctx, sweat, screenX - player.facing * 2, screenY - 26, flip, 'enemy');
   }
 }

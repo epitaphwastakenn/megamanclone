@@ -19,7 +19,7 @@ const enemyTypes = {
   blader: { w: 14, h: 12, hp: 1, damage: 3 },
   screw: { w: 16, h: 8, hp: 3, damage: 2 },
   blaster: { w: 14, h: 16, hp: 1, damage: 2 },
-  bigEye: { w: 28, h: 40, hp: 20, damage: 10 },
+  bigEye: { w: 26, h: 36, hp: 20, damage: 10 },
 };
 
 // FUNCTIONS
@@ -94,13 +94,13 @@ function drawPlayerShots(ctx) {
     const sy = shot.y - camera.y;
     const flip = shot.dir < 0;
     if (shot.kind === 'pellet') drawSprite(ctx, 'busterShot', sx, sy, flip, 'enemy');
-    else if (shot.kind === 'mid') drawSprite(ctx, Math.floor(shot.age / 2) % 2 ? 'chargeMid1' : 'chargeMid2', sx, sy, flip, 'enemy');
-    else drawSprite(ctx, Math.floor(shot.age / 2) % 2 ? 'chargeFull1' : 'chargeFull2', sx, sy, flip, 'enemy');
+    else if (shot.kind === 'mid') drawSprite(ctx, 'chargeMid' + (1 + (Math.floor(shot.age / 3) % 2)), sx, sy, flip, 'enemy');
+    else drawSprite(ctx, 'chargeFull' + (1 + (Math.floor(shot.age / 3) % 2)), sx, sy, flip, 'enemy');
   }
 }
 
-function fireEnemyShot(x, y, vx, vy, damage) {
-  enemyShots.push({ x, y, vx, vy, damage: damage || 2, w: 6, h: 6 });
+function fireEnemyShot(x, y, vx, vy, damage, sprite) {
+  enemyShots.push({ x, y, vx, vy, damage: damage || 2, w: 6, h: 6, sprite: sprite || 'enemyShot' });
 }
 
 function updateEnemyShots() {
@@ -121,7 +121,7 @@ function updateEnemyShots() {
 }
 
 function drawEnemyShots(ctx) {
-  for (const shot of enemyShots) drawSprite(ctx, 'enemyShot', shot.x - camera.x, shot.y - camera.y, false, 'enemy');
+  for (const shot of enemyShots) drawSprite(ctx, shot.sprite, shot.x - camera.x, shot.y - camera.y, false, 'enemy');
 }
 
 function createEnemy(spawn) {
@@ -296,7 +296,7 @@ function updateBlaster(enemy) {
     const shotIndex = [54, 44, 34, 24].indexOf(enemy.timer);
     if (shotIndex >= 0) {
       const vy = [-1.6, -0.6, 0.6, 1.6][shotIndex];
-      fireEnemyShot(enemy.x + enemy.facing * 8, enemy.y - 8, enemy.facing * 2.2, vy);
+      fireEnemyShot(enemy.x + enemy.facing * 8, enemy.y - 8, enemy.facing * 2.2, vy, 2, 'beakShot');
       playSfx('enemyShot');
     }
     if (enemy.timer <= 0) {
@@ -360,12 +360,16 @@ function enemySprite(enemy) {
     case 'blader':
       return Math.floor(enemy.anim / 3) % 2 ? 'blader1' : 'blader2';
     case 'screw':
-      if (enemy.state === 'closed') return 'screwClosed';
-      return Math.floor(enemy.anim / 3) % 2 ? 'screwOpen1' : 'screwOpen2';
+      if (enemy.state === 'closed') return 'screw0';
+      if (enemy.timer < 4 || enemy.timer > 52) return 'screw1';
+      return 'screw' + (2 + (Math.floor(enemy.anim / 3) % 3));
     case 'blaster':
-      return enemy.state === 'closed' ? 'blasterClosed' : 'blasterOpen';
+      if (enemy.state === 'closed') return enemy.timer < 6 ? 'beak1' : 'beak0';
+      if (enemy.timer > 58 || enemy.timer < 6) return enemy.timer > 61 || enemy.timer < 3 ? 'beak1' : 'beak2';
+      return 'beak3';
     case 'bigEye':
-      return enemy.onGround ? 'bigEyeStand' : 'bigEyeJump';
+      if (!enemy.onGround) return enemy.vy < 0 ? 'bigEye2' : 'bigEye3';
+      return enemy.timer < 8 ? 'bigEye1' : 'bigEye0';
   }
   return null;
 }
@@ -410,7 +414,7 @@ function updateSpawns(room) {
 }
 
 function spawnItem(type, x, y, temporary, levelId) {
-  const size = type === 'energyBig' ? { w: 14, h: 11 } : type === 'oneUp' ? { w: 14, h: 13 } : { w: 8, h: 6 };
+  const size = type === 'energySmall' ? { w: 8, h: 8 } : { w: 14, h: 14 };
   items.push({ type, x, y, vy: temporary ? -2 : 0, w: size.w, h: size.h, timer: temporary ? 360 : -1, levelId, anim: 0, onGround: false });
 }
 
@@ -491,8 +495,8 @@ function updateEffects() {
     effect.x += effect.vx;
     effect.y += effect.vy;
     let done = false;
-    if (effect.type === 'explode') done = effect.timer >= 16;
-    else if (effect.type === 'hitSpark') done = effect.timer >= 6;
+    if (effect.type === 'explode') done = effect.timer >= 20;
+    else if (effect.type === 'hitSpark') done = effect.timer >= 4;
     else if (effect.type === 'dust') {
       effect.y -= 0.3;
       done = effect.timer >= 12;
@@ -505,7 +509,7 @@ function drawEffects(ctx) {
   for (const effect of effects) {
     const sx = effect.x - camera.x;
     const sy = effect.y - camera.y;
-    if (effect.type === 'explode') drawSprite(ctx, 'explode' + (1 + Math.min(3, Math.floor(effect.timer / 4))), sx, sy, false, 'enemy');
+    if (effect.type === 'explode') drawSprite(ctx, 'explode' + (1 + Math.min(4, Math.floor(effect.timer / 4))), sx, sy, false, 'enemy');
     else if (effect.type === 'hitSpark') drawSprite(ctx, 'hitSpark', sx, sy, false, 'enemy');
     else if (effect.type === 'dust') drawSprite(ctx, 'dust' + (1 + Math.min(2, Math.floor(effect.timer / 4))), sx, sy, false, 'enemy');
     else if (effect.type === 'orb') {

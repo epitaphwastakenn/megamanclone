@@ -46,20 +46,21 @@ const palettes = {
   megaCharge1: { K: 0x0F, B: 0x2C, C: 0x30 },
   megaCharge2: { K: 0x2C, B: 0x11, C: 0x2C },
   megaCharge3: { K: 0x30, B: 0x21, C: 0x31 },
-  megaCutter: { B: 0x00, C: 0x30 },
+  megaTimber: { B: 0x16, C: 0x10, A: 0x16, v: 0x06 },
   megaFlash: { K: 0x30, B: 0x30, C: 0x30, S: 0x30 },
-  cutMan: {},
-  orbCut: { B: 0x16, C: 0x27 },
-  cutFlash: { K: 0x30, R: 0x30, O: 0x30, G: 0x30, S: 0x30, D: 0x30 },
+  boss: {},
+  orbBoss: { C: 0x16, W: 0x30 },
   enemy: {},
-  enemyFlash: { K: 0x30, R: 0x30, O: 0x30, B: 0x30, C: 0x30, G: 0x30, g: 0x30, e: 0x30, Y: 0x30, D: 0x30, P: 0x30, p: 0x30 },
+  enemyFlash: { all: 0x30, K: 0x0F },
+  bossFlash: { all: 0x30, K: 0x0F },
 };
 
 // FUNCTIONS
 
 function paletteColor(letter, paletteName) {
   const overrides = palettes[paletteName] || {};
-  const index = letter in overrides ? overrides[letter] : basePalette[letter];
+  let index = letter in overrides ? overrides[letter] : basePalette[letter];
+  if (!(letter in overrides) && 'all' in overrides) index = overrides.all;
   if (index === undefined) return null;
   return nesPalette[index];
 }

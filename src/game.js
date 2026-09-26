@@ -541,7 +541,7 @@ function updateBossPresent() {
     }
   }
   const typed = present.landed ? Math.floor((game.timer - present.landTime - 30) / 6) : -1;
-  if (typed >= 0 && typed < 7 && (game.timer - present.landTime - 30) % 6 === 0 && 'CUT MAN'[typed] !== ' ') playSfx('blip');
+  if (typed >= 0 && typed < 10 && (game.timer - present.landTime - 30) % 6 === 0 && 'TIMBER MAN'[typed] !== ' ') playSfx('blip');
   if (game.timer === 330 || (game.timer > 60 && input.pressed.start)) {
     startFade(() => {
       game.lives = 3;
@@ -561,15 +561,15 @@ function drawBossPresent(ctx) {
   drawStars(ctx, 92, 148);
   const present = game.present;
   if (!present) return;
-  let pose = 'cutJump';
+  let pose = 'timberJump';
   if (present.landed) {
     const since = game.timer - present.landTime;
-    pose = since < 16 ? 'cutStand' : Math.floor(since / 12) % 3 === 1 ? 'cutThrow' : 'cutStand';
+    pose = since < 16 ? 'timberStand' : since < 40 ? 'timberPose' : Math.floor(since / 12) % 3 === 1 ? 'timberStand' : 'timberPose';
   }
-  drawSprite(ctx, pose, screenWidth / 2, present.y, false, 'cutMan');
+  drawSprite(ctx, pose, screenWidth / 2, present.y, false, 'boss');
   if (present.landed) {
-    const count = Math.max(0, Math.min(7, Math.floor((game.timer - present.landTime - 30) / 6) + 1));
-    drawText(ctx, 'CUT MAN'.slice(0, count), screenWidth / 2 - 28, 172, nesPalette[0x30]);
+    const count = Math.max(0, Math.min(10, Math.floor((game.timer - present.landTime - 30) / 6) + 1));
+    drawText(ctx, 'TIMBER MAN'.slice(0, count), screenWidth / 2 - 40, 172, nesPalette[0x30]);
   }
 }
 
@@ -591,15 +591,15 @@ function drawWeaponGet(ctx) {
   ctx.fillRect(0, 0, screenWidth, screenHeight);
   drawStars(ctx, 0, screenHeight);
   const flashing = game.timer < 150;
-  const palette = flashing ? (Math.floor(game.timer / 6) % 2 ? 'megaCutter' : 'mega') : 'megaCutter';
-  drawSpriteScaled(ctx, 'megaStand', 72, 136, false, palette, 2);
+  const palette = flashing ? (Math.floor(game.timer / 6) % 2 ? 'megaTimber' : 'mega') : 'megaTimber';
+  drawSprite(ctx, 'megaWeaponGet', 64, 172, false, palette);
   const lineOne = 'YOU GOT';
-  const lineTwo = 'ROLLING CUTTER';
+  const lineTwo = 'TIMBER AXE';
   const typedOne = Math.max(0, Math.min(lineOne.length, Math.floor((game.timer - 40) / 5)));
   const typedTwo = Math.max(0, Math.min(lineTwo.length, Math.floor((game.timer - 90) / 5)));
   drawText(ctx, lineOne.slice(0, typedOne), 120, 92, nesPalette[0x30]);
   drawText(ctx, lineTwo.slice(0, typedTwo), 120, 108, nesPalette[0x30]);
-  if (game.timer > 170) drawSprite(ctx, 'cutter' + (Math.floor(game.timer / 4) % 4), 180, 140, false, 'cutMan');
+  if (game.timer > 170) drawSprite(ctx, 'axe' + (Math.floor(game.timer / 4) % 4), 176, 140, false, 'boss');
   if (game.timer > 240 && Math.floor(game.timer / 20) % 2 === 0) drawTextCentered(ctx, 'PRESS START', screenWidth / 2, 200, nesPalette[0x30]);
   if (game.timer > 20 && game.timer < 130 && game.timer % 5 === 0) playSfx('blip');
 }

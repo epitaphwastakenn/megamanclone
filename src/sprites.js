@@ -55,6 +55,41 @@ function getSpriteCanvas(name, paletteName, flip) {
   return canvas;
 }
 
+function composeArt(width, height, parts) {
+  const grid = [];
+  for (let y = 0; y < height; y++) grid.push(new Array(width).fill('.'));
+  for (const [rows, dx, dy] of parts) {
+    for (let y = 0; y < rows.length; y++) {
+      const row = rows[y];
+      for (let x = 0; x < row.length; x++) {
+        const ch = row[x];
+        if (ch === '.') continue;
+        const gx = x + dx;
+        const gy = y + dy;
+        if (gx < 0 || gy < 0 || gx >= width || gy >= height) continue;
+        grid[gy][gx] = ch === '_' ? '.' : ch;
+      }
+    }
+  }
+  return grid.map(row => row.join(''));
+}
+
+function recolorArt(rows, map) {
+  return rows.map(row => row.split('').map(ch => map[ch] || ch).join(''));
+}
+
+function rotateArt(rows) {
+  const height = rows.length;
+  const width = Math.max(...rows.map(row => row.length));
+  const result = [];
+  for (let x = 0; x < width; x++) {
+    let line = '';
+    for (let y = height - 1; y >= 0; y--) line += rows[y][x] || '.';
+    result.push(line);
+  }
+  return result;
+}
+
 function drawSprite(ctx, name, x, y, flip, paletteName) {
   const def = spriteDefs[name];
   const canvas = getSpriteCanvas(name, paletteName || 'mega', flip);

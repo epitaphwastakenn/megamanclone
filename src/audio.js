@@ -243,8 +243,8 @@ function playSfx(name) {
       playFrames('door', 'noiseShort', frames);
       break;
     }
-    case 'cutter':
-      playFrames('cutter', 0.125, [[2349, 0.14], [2349, 0.12], [1568, 0.12], [1568, 0.1], [2349, 0.1], [2349, 0.08], [1568, 0.08], [1568, 0.06]]);
+    case 'axe':
+      playFrames('axe', 0.25, [[587, 0.16], [698, 0.14], [880, 0.12], [698, 0.1], [587, 0.08], [0, 0], [0, 0], [0, 0]]);
       break;
     case 'thud':
       playFrames('thud', 'noise', sweepFrames(4709, 440, 12, 0.5, 0));

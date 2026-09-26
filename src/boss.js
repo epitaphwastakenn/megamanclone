@@ -3,7 +3,7 @@
 const bossStats = {
   maxHealth: 28,
   contactDamage: 4,
-  cutterDamage: 4,
+  axeDamage: 4,
   runSpeed: 1.25,
   jumpSpeed: 5.2,
   invulnFrames: 20,
@@ -14,15 +14,15 @@ const boss = {
   active: false,
   x: 0,
   y: 0,
-  w: 16,
-  h: 24,
+  w: 18,
+  h: 28,
   vx: 0,
   vy: 0,
   facing: -1,
   health: 0,
   state: 'none',
   timer: 0,
-  hasCutter: true,
+  hasAxe: true,
   invuln: 0,
   onGround: false,
   anim: 0,
@@ -32,7 +32,7 @@ const boss = {
   jumpTimer: 0,
 };
 
-const cutter = { active: false, x: 0, y: 0, targetX: 0, targetY: 0, phase: 'out', age: 0 };
+const bossAxe = { active: false, x: 0, y: 0, targetX: 0, targetY: 0, phase: 'out', age: 0 };
 
 // FUNCTIONS
 
@@ -47,7 +47,7 @@ function spawnBoss(x, y) {
     health: 0,
     state: 'drop',
     timer: 0,
-    hasCutter: true,
+    hasAxe: true,
     invuln: 0,
     onGround: false,
     anim: 0,
@@ -56,14 +56,14 @@ function spawnBoss(x, y) {
     jumpCooldown: 0,
     jumpTimer: 120,
   });
-  cutter.active = false;
+  bossAxe.active = false;
 }
 
 function clearBoss() {
   boss.active = false;
   boss.visible = false;
   boss.state = 'none';
-  cutter.active = false;
+  bossAxe.active = false;
 }
 
 function bossFacePlayer() {
@@ -90,47 +90,47 @@ function bossPhysics() {
   }
 }
 
-function throwCutter() {
-  cutter.active = true;
-  cutter.x = boss.x + boss.facing * 6;
-  cutter.y = boss.y - 30;
-  cutter.targetX = player.x;
-  cutter.targetY = player.y - 12;
-  cutter.phase = 'out';
-  cutter.age = 0;
-  boss.hasCutter = false;
+function throwAxe() {
+  bossAxe.active = true;
+  bossAxe.x = boss.x + boss.facing * 6;
+  bossAxe.y = boss.y - 30;
+  bossAxe.targetX = player.x;
+  bossAxe.targetY = player.y - 12;
+  bossAxe.phase = 'out';
+  bossAxe.age = 0;
+  boss.hasAxe = false;
 }
 
-function updateCutter() {
-  if (!cutter.active) return;
-  cutter.age++;
-  if (cutter.age % 8 === 1) playSfx('cutter');
+function updateAxe() {
+  if (!bossAxe.active) return;
+  bossAxe.age++;
+  if (bossAxe.age % 8 === 1) playSfx('axe');
   const speed = 3.6;
-  let tx = cutter.targetX;
-  let ty = cutter.targetY;
-  if (cutter.phase === 'back') {
+  let tx = bossAxe.targetX;
+  let ty = bossAxe.targetY;
+  if (bossAxe.phase === 'back') {
     tx = boss.x;
     ty = boss.y - 30;
   }
-  const dx = tx - cutter.x;
-  const dy = ty - cutter.y;
+  const dx = tx - bossAxe.x;
+  const dy = ty - bossAxe.y;
   const distance = Math.hypot(dx, dy);
   if (distance <= speed) {
-    cutter.x = tx;
-    cutter.y = ty;
-    if (cutter.phase === 'out') cutter.phase = 'back';
+    bossAxe.x = tx;
+    bossAxe.y = ty;
+    if (bossAxe.phase === 'out') bossAxe.phase = 'back';
     else {
-      cutter.active = false;
-      boss.hasCutter = true;
+      bossAxe.active = false;
+      boss.hasAxe = true;
       boss.throwCooldown = 30 + Math.floor(Math.random() * 50);
       return;
     }
   } else {
-    cutter.x += (dx / distance) * speed;
-    cutter.y += (dy / distance) * speed;
+    bossAxe.x += (dx / distance) * speed;
+    bossAxe.y += (dy / distance) * speed;
   }
-  if (cutter.phase === 'out' && cutter.age > 70) cutter.phase = 'back';
-  if (!player.dead && boxesOverlap(centerBox(cutter.x, cutter.y, 12, 12), playerHitBox())) hurtPlayer(bossStats.cutterDamage);
+  if (bossAxe.phase === 'out' && bossAxe.age > 70) bossAxe.phase = 'back';
+  if (!player.dead && boxesOverlap(centerBox(bossAxe.x, bossAxe.y, 12, 12), playerHitBox())) hurtPlayer(bossStats.axeDamage);
 }
 
 function updateBossAI() {
@@ -139,7 +139,7 @@ function updateBossAI() {
   if (boss.state === 'throw') {
     boss.timer++;
     boss.vx = 0;
-    if (boss.timer === 5) throwCutter();
+    if (boss.timer === 5) throwAxe();
     if (boss.timer >= 16) boss.state = 'fight';
     bossPhysics();
     return;
@@ -147,7 +147,7 @@ function updateBossAI() {
   if (boss.onGround) {
     bossFacePlayer();
     boss.jumpTimer--;
-    if (boss.hasCutter && boss.throwCooldown <= 0) {
+    if (boss.hasAxe && boss.throwCooldown <= 0) {
       boss.state = 'throw';
       boss.timer = 0;
       boss.vx = 0;
@@ -184,7 +184,7 @@ function updateBoss(allowContact) {
   } else if (boss.state === 'idle') {
     bossPhysics();
   }
-  updateCutter();
+  updateAxe();
   if (allowContact && boss.visible && !player.dead && boxesOverlap(bodyBox(boss), playerHitBox())) hurtPlayer(bossStats.contactDamage);
 }
 
@@ -203,29 +203,26 @@ function hitBossWithShot(shot, box) {
 function defeatBoss() {
   boss.state = 'dead';
   boss.visible = false;
-  cutter.active = false;
-  spawnDeathOrbs(boss.x, boss.y - 14, 'orbCut');
+  bossAxe.active = false;
+  spawnDeathOrbs(boss.x, boss.y - 14, 'orbBoss');
   stopSong();
   playSfx('bossDeath');
   onBossDefeated();
 }
 
 function bossSprite() {
-  const suffix = boss.hasCutter ? '' : 'X';
-  if (boss.state === 'throw') return 'cutThrow' + suffix;
-  if (boss.state === 'pose') {
-    const beat = Math.floor(boss.timer / 10) % 4;
-    return (beat === 1 || beat === 3 ? 'cutThrow' : 'cutStand') + suffix;
-  }
-  if (!boss.onGround) return 'cutJump' + suffix;
-  if (boss.vx !== 0) return 'cutRun' + [1, 2, 3, 2][Math.floor(boss.anim / 7) % 4] + suffix;
-  return 'cutStand' + suffix;
+  const suffix = boss.hasAxe ? '' : 'X';
+  if (boss.state === 'throw') return boss.timer < 5 ? 'timberPose' : 'timberThrow';
+  if (boss.state === 'pose') return Math.floor(boss.timer / 12) % 4 === 1 ? 'timberStand' : 'timberPose';
+  if (!boss.onGround) return 'timberJump' + suffix;
+  if (boss.vx !== 0) return 'timberRun' + (1 + (Math.floor(boss.anim / 8) % 2)) + suffix;
+  return 'timberStand' + suffix;
 }
 
 function drawBoss(ctx) {
   if (!boss.active) return;
   if (boss.visible && !(boss.invuln > 0 && Math.floor(boss.invuln / 2) % 2 === 0)) {
-    drawSprite(ctx, bossSprite(), boss.x - camera.x, boss.y - camera.y, boss.facing < 0, 'cutMan');
+    drawSprite(ctx, bossSprite(), boss.x - camera.x, boss.y - camera.y, boss.facing < 0, 'boss');
   }
-  if (cutter.active) drawSprite(ctx, 'cutter' + (Math.floor(cutter.age / 3) % 4), cutter.x - camera.x, cutter.y - camera.y, false, 'cutMan');
+  if (bossAxe.active) drawSprite(ctx, 'axe' + (Math.floor(bossAxe.age / 3) % 4), bossAxe.x - camera.x, bossAxe.y - camera.y, bossAxe.x > boss.x, 'boss');
 }
