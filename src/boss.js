@@ -130,7 +130,7 @@ function updateAxe() {
     bossAxe.y += (dy / distance) * speed;
   }
   if (bossAxe.phase === 'out' && bossAxe.age > 70) bossAxe.phase = 'back';
-  if (!player.dead && boxesOverlap(centerBox(bossAxe.x, bossAxe.y, 12, 12), playerHitBox())) hurtPlayer(bossStats.axeDamage);
+  if (!player.dead && boxesOverlap(centerBox(bossAxe.x, bossAxe.y, 18, 18), playerHitBox())) hurtPlayer(bossStats.axeDamage);
 }
 
 function updateBossAI() {
@@ -216,6 +216,7 @@ function bossSprite() {
   if (boss.state === 'pose') return Math.floor(boss.timer / 12) % 4 === 1 ? 'timberStand' : 'timberPose';
   if (!boss.onGround) return 'timberJump' + suffix;
   if (boss.vx !== 0) return 'timberRun' + (1 + (Math.floor(boss.anim / 8) % 2)) + suffix;
+  if (boss.hasAxe && boss.throwCooldown % 70 < 5) return 'timberBlink';
   return 'timberStand' + suffix;
 }
 
@@ -224,5 +225,5 @@ function drawBoss(ctx) {
   if (boss.visible && !(boss.invuln > 0 && Math.floor(boss.invuln / 2) % 2 === 0)) {
     drawSprite(ctx, bossSprite(), boss.x - camera.x, boss.y - camera.y, boss.facing < 0, 'boss');
   }
-  if (bossAxe.active) drawSprite(ctx, 'axe' + (Math.floor(bossAxe.age / 3) % 4), bossAxe.x - camera.x, bossAxe.y - camera.y, bossAxe.x > boss.x, 'boss');
+  if (bossAxe.active) drawSprite(ctx, 'axe' + (Math.floor(bossAxe.age / 2) % 4), bossAxe.x - camera.x, bossAxe.y - camera.y, bossAxe.x > boss.x, 'boss');
 }
