@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mega Man - Sprites</title>
+<style>
+  body { background: #202028; color: #fcfcfc; font-family: monospace; margin: 16px; }
+  h1 { font-size: 18px; }
+  h2 { font-size: 14px; margin-top: 24px; color: #00e8d8; }
+  .grid { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+  .cell { background: #000; padding: 6px; display: flex; flex-direction: column; align-items: center; }
+  .cell.light { background: #3cbcfc; }
+  .cell canvas { image-rendering: pixelated; }
+  .cell span { font-size: 11px; margin-top: 4px; }
+  .cell.light span { color: #000; }
+  label { margin-right: 12px; }
+  a { color: #00e8d8; }
+</style>
+</head>
+<body>
+<h1>Mega Man NES Remake - Sprites</h1>
+<p>
+  <label>Zoom <input id="zoom" type="range" min="1" max="8" value="4"></label>
+  <label><input id="light" type="checkbox"> Fundo azul</label>
+  <a href="index.html">Jogar</a>
+</p>
+<h2>Animacoes</h2>
+<div id="animations" class="grid"></div>
+<h2>Todos os sprites</h2>
+<div id="gallery" class="grid"></div>
+<h2>Tiles</h2>
+<div id="tiles" class="grid"></div>
+<h2>Fonte</h2>
+<div id="font" class="grid"></div>
+<script src="src/palette.js"></script>
+<script src="src/sprites.js"></script>
+<script src="src/art/megaman.js"></script>
+<script src="src/art/enemies.js"></script>
+<script src="src/art/cutman.js"></script>
+<script src="src/art/effects.js"></script>
+<script src="src/art/tiles.js"></script>
+<script src="src/art/font.js"></script>
+<script>
+// VARIABLES
+
+const zoomInput = document.getElementById('zoom');
+const lightInput = document.getElementById('light');
+const animationCells = [];
+let tick = 0;
+
+const animations = [
+  { label: 'Parado / piscando', fps: 8, frames: [...Array(14).fill('megaStand'), 'megaBlink'] },
+  { label: 'Passinho', fps: 4, frames: ['megaStand', 'megaStep'] },
+  { label: 'Correndo', fps: 8, frames: ['megaRun1', 'megaRun2', 'megaRun3', 'megaRun2'] },
+  { label: 'Correndo atirando', fps: 8, frames: ['megaRunShoot1', 'megaRunShoot2', 'megaRunShoot3', 'megaRunShoot2'] },
+  { label: 'Pulo / tiro', fps: 2, frames: ['megaJump', 'megaJumpShoot'] },
+  { label: 'Escada', fps: 6, frames: [{ sprite: 'megaClimb' }, { sprite: 'megaClimb', flip: true }] },
+  { label: 'Topo da escada / tiro', fps: 2, frames: ['megaClimbTop', 'megaClimbShoot'] },
+  { label: 'Slide', fps: 1, frames: ['megaSlide'] },
+  { label: 'Dano', fps: 10, frames: [{ sprite: 'megaHurt', overlay: 'hurtSpark1' }, { sprite: 'megaHurt', overlay: 'hurtSpark2' }] },
+  { label: 'Teleporte', fps: 10, frames: ['megaBeam', 'megaBeam', 'megaBeam', 'megaTeleportA', 'megaTeleportB', 'megaTeleportA', 'megaTeleportB', 'megaStand', 'megaStand', 'megaStand', 'megaStand'] },
+  { label: 'Carga media', fps: 8, frames: [{ sprite: 'megaStand', palette: 'mega' }, { sprite: 'megaStand', palette: 'megaCharge1' }] },
+  { label: 'Carga total', fps: 20, frames: [{ sprite: 'megaStand', palette: 'megaCharge2' }, { sprite: 'megaStand', palette: 'megaCharge3' }, { sprite: 'megaStand', palette: 'mega' }] },
+  { label: 'Arma Rolling Cutter', fps: 6, frames: [{ sprite: 'megaShoot', palette: 'mega' }, { sprite: 'megaShoot', palette: 'megaCutter' }] },
+  { label: 'Cut Man correndo', fps: 8, frames: ['cutRun1', 'cutRun2', 'cutRun3', 'cutRun2'].map(sprite => ({ sprite, palette: 'cutMan' })) },
+  { label: 'Cut Man arremesso', fps: 4, frames: ['cutStand', 'cutThrow', 'cutThrowX', 'cutStandX', 'cutJumpX', 'cutJump'].map(sprite => ({ sprite, palette: 'cutMan' })) },
+  { label: 'Rolling Cutter', fps: 15, frames: ['cutter0', 'cutter1', 'cutter2', 'cutter3'].map(sprite => ({ sprite, palette: 'cutMan' })) },
+  { label: 'Met', fps: 2, frames: ['metHide', 'metHide', 'metOpen', 'metOpen'] },
+  { label: 'Blader', fps: 15, frames: ['blader1', 'blader2'] },
+  { label: 'Screw Bomber', fps: 10, frames: ['screwClosed', 'screwClosed', 'screwClosed', 'screwOpen1', 'screwOpen2', 'screwOpen1', 'screwOpen2'] },
+  { label: 'Blaster', fps: 2, frames: ['blasterClosed', 'blasterOpen'] },
+  { label: 'Big Eye', fps: 2, frames: ['bigEyeStand', 'bigEyeJump'] },
+  { label: 'Tiro / carga', fps: 10, frames: ['busterShot', 'busterShot', 'chargeMid1', 'chargeMid2', 'chargeFull1', 'chargeFull2'] },
+  { label: 'Explosao', fps: 12, frames: ['explode1', 'explode2', 'explode3', 'explode4', 'explode4'] },
+  { label: 'Orbes de morte', fps: 16, frames: ['orbSmall', 'orbBig1', 'orbBig2', 'orbBig1'] },
+  { label: 'Orbes Cut Man', fps: 16, frames: ['orbSmall', 'orbBig1', 'orbBig2', 'orbBig1'].map(sprite => ({ sprite, palette: 'orbCut' })) },
+  { label: 'Poeira', fps: 10, frames: ['dust1', 'dust2', 'dust3'] },
+  { label: 'Energia', fps: 6, frames: ['energySmall1', 'energySmall2', 'energyBig1', 'energyBig2', 'energyBig1', 'energyBig2'] },
+];
+
+// FUNCTIONS
+
+function spritePaletteFor(name) {
+  if (name.startsWith('mega') || name === 'oneUp') return 'mega';
+  if (name.startsWith('cut')) return 'cutMan';
+  return 'enemy';
+}
+
+function normalizeFrame(frame) {
+  const entry = typeof frame === 'string' ? { sprite: frame } : frame;
+  return { palette: spritePaletteFor(entry.sprite), flip: false, ...entry };
+}
+
+function makeCell(label, width, height) {
+  const cell = document.createElement('div');
+  cell.className = 'cell' + (lightInput.checked ? ' light' : '');
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const text = document.createElement('span');
+  text.textContent = label;
+  cell.appendChild(canvas);
+  cell.appendChild(text);
+  return { cell, canvas };
+}
+
+function renderStatic() {
+  const zoom = Number(zoomInput.value);
+  const gallery = document.getElementById('gallery');
+  const tiles = document.getElementById('tiles');
+  gallery.innerHTML = '';
+  tiles.innerHTML = '';
+  for (const name in spriteDefs) {
+    const def = spriteDefs[name];
+    const { cell, canvas } = makeCell(name + ' ' + def.width + 'x' + def.height, def.width * zoom, def.height * zoom);
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(getSpriteCanvas(name, spritePaletteFor(name), false), 0, 0, canvas.width, canvas.height);
+    (name.startsWith('tile') ? tiles : gallery).appendChild(cell);
+  }
+  const font = document.getElementById('font');
+  font.innerHTML = '';
+  const fontZoom = Math.max(1, Math.floor(zoom / 2));
+  const { cell, canvas } = makeCell('fonte 8x8', 8 * 24 * fontZoom, 8 * 3 * fontZoom);
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  ctx.scale(fontZoom, fontZoom);
+  drawText(ctx, 'ABCDEFGHIJKLMNOPQRSTUVWX', 0, 0, nesPalette[0x30]);
+  drawText(ctx, 'YZ0123456789!.,-:?>/+*()', 0, 8, nesPalette[0x2C]);
+  drawText(ctx, 'READY  PAUSE  GAME OVER', 0, 16, nesPalette[0x28]);
+  font.appendChild(cell);
+}
+
+function renderAnimations() {
+  const zoom = Number(zoomInput.value);
+  const container = document.getElementById('animations');
+  container.innerHTML = '';
+  animationCells.length = 0;
+  for (const animation of animations) {
+    const frames = animation.frames.map(normalizeFrame);
+    let width = 0;
+    let height = 0;
+    for (const frame of frames) {
+      const def = spriteDefs[frame.sprite];
+      width = Math.max(width, def.width + 8);
+      height = Math.max(height, def.height + 4);
+    }
+    const { cell, canvas } = makeCell(animation.label, width * zoom, height * zoom);
+    container.appendChild(cell);
+    animationCells.push({ animation, frames, canvas, width, height, zoom });
+  }
+}
+
+function drawAnimations() {
+  tick++;
+  for (const entry of animationCells) {
+    const index = Math.floor((tick / 60) * entry.animation.fps) % entry.frames.length;
+    const frame = entry.frames[index];
+    const ctx = entry.canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    ctx.setTransform(entry.zoom, 0, 0, entry.zoom, 0, 0);
+    ctx.clearRect(0, 0, entry.width, entry.height);
+    const def = spriteDefs[frame.sprite];
+    const anchorX = Math.floor(entry.width / 2);
+    const drawY = def.oy === def.height ? entry.height - 2 : Math.floor((entry.height - def.height) / 2) + def.oy;
+    drawSprite(ctx, frame.sprite, anchorX, drawY, frame.flip, frame.palette);
+    if (frame.overlay) drawSprite(ctx, frame.overlay, anchorX, drawY - 10, false, 'enemy');
+  }
+  requestAnimationFrame(drawAnimations);
+}
+
+function renderAll() {
+  renderStatic();
+  renderAnimations();
+}
+
+// INITIALIZATION
+
+for (const group of [megaArt, enemyArt, bossArt, effectArt, itemArt, tileArt]) defineSprites(group);
+zoomInput.addEventListener('input', renderAll);
+lightInput.addEventListener('change', renderAll);
+renderAll();
+requestAnimationFrame(drawAnimations);
+</script>
+</body>
+</html>
