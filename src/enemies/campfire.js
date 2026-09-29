@@ -101,7 +101,8 @@ function updateMallowBot(enemy) {
   enemy.timer--;
   const distance = Math.abs(player.x - enemy.x);
   if (enemy.state === 'roast') {
-    if (enemy.timer <= 0 && distance < 168 && Math.abs(player.y - enemy.y) < 96) {
+    const visible = enemy.x > camera.x + 16 && enemy.x < camera.x + screenWidth - 16;
+    if (enemy.timer <= 0 && visible && distance < 128 && Math.abs(player.y - enemy.y) < 96) {
       enemy.state = 'ready';
       enemy.timer = 34;
       campfireSound('ignite');
