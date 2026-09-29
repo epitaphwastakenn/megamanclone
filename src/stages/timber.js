@@ -56,7 +56,6 @@ function buildTimberStage() {
   b2.ladder(3, 11, 14);
   b2.ladder(12, 0, 6);
   b2.back(2, 0, 12, 15, 'b');
-  b2.spawn('met', 10, 9);
   b2.spawn('blader', 13, 1);
   b2.item('weaponSmall', 13, 7);
 
