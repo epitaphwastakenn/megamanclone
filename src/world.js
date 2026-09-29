@@ -2,13 +2,24 @@
 
 const doors = {};
 const camera = { x: 0, y: 0 };
-const solidTiles = '#=MI^';
+const brokenTiles = [];
+const defaultTileTypes = { '#': 'solid', '=': 'solid', M: 'solid', I: 'ice', '^': 'spike', H: 'ladder', D: 'door' };
+const solidTileTypes = { solid: true, ice: true, spike: true, breakable: true, slow: true, conveyorLeft: true, conveyorRight: true };
+let tileTypes = { ...defaultTileTypes };
 
 // FUNCTIONS
+
+function setStageTileTypes(extra) {
+  tileTypes = { ...defaultTileTypes, ...(extra || {}) };
+}
 
 function tileAt(col, row) {
   if (row < 0 || row >= levelRows || col < 0 || col >= levelCols) return '.';
   return levelTiles[row][col];
+}
+
+function tileTypeAt(col, row) {
+  return tileTypes[tileAt(col, row)] || null;
 }
 
 function doorKey(col) {
@@ -22,30 +33,76 @@ function getDoor(col) {
 }
 
 function isSolidTile(col, row) {
-  const ch = tileAt(col, row);
-  if (solidTiles.includes(ch)) return true;
-  if (ch === 'D') return getDoor(col).openAmount < 64;
+  const type = tileTypeAt(col, row);
+  if (!type) return false;
+  if (solidTileTypes[type]) return true;
+  if (type === 'door') return getDoor(col).openAmount < 64;
   return false;
 }
 
 function isIceTile(col, row) {
-  return tileAt(col, row) === 'I';
+  return tileTypeAt(col, row) === 'ice';
 }
 
 function isSpikeTile(col, row) {
-  return tileAt(col, row) === '^';
+  return tileTypeAt(col, row) === 'spike';
+}
+
+function isOneWayTile(col, row) {
+  return tileTypeAt(col, row) === 'oneWay';
+}
+
+function isWaterTile(col, row) {
+  return tileTypeAt(col, row) === 'water';
+}
+
+function isWaterAt(x, y) {
+  return isWaterTile(Math.floor(x / tileSize), Math.floor(y / tileSize));
+}
+
+function feetColumns(body) {
+  return {
+    row: Math.floor((body.y + 0.5) / tileSize),
+    colStart: Math.floor((body.x - body.w / 2) / tileSize),
+    colEnd: Math.floor((body.x + body.w / 2 - 0.01) / tileSize),
+  };
+}
+
+function standingOnType(body, wanted) {
+  const { row, colStart, colEnd } = feetColumns(body);
+  let found = false;
+  for (let col = colStart; col <= colEnd; col++) {
+    const type = tileTypeAt(col, row);
+    if (type === wanted) found = true;
+    else if (isSolidTile(col, row)) return false;
+  }
+  return found;
 }
 
 function standingOnIce(body) {
-  const row = Math.floor((body.y + 0.5) / tileSize);
-  const colStart = Math.floor((body.x - body.w / 2) / tileSize);
-  const colEnd = Math.floor((body.x + body.w / 2 - 0.01) / tileSize);
-  let ice = false;
-  for (let col = colStart; col <= colEnd; col++) {
-    if (isIceTile(col, row)) ice = true;
-    else if (isSolidTile(col, row)) return false;
+  return standingOnType(body, 'ice');
+}
+
+function standingOnSlow(body) {
+  return standingOnType(body, 'slow');
+}
+
+function conveyorUnder(body) {
+  if (standingOnType(body, 'conveyorLeft')) return -1;
+  if (standingOnType(body, 'conveyorRight')) return 1;
+  return 0;
+}
+
+function bodyTouchesType(body, wanted, margin) {
+  const extra = margin || 0;
+  const colStart = Math.floor((body.x - body.w / 2 - extra) / tileSize);
+  const colEnd = Math.floor((body.x + body.w / 2 + extra - 0.01) / tileSize);
+  const rowStart = Math.floor((body.y - body.h) / tileSize);
+  const rowEnd = Math.floor((body.y + extra - 0.01) / tileSize);
+  for (let row = rowStart; row <= rowEnd; row++) {
+    for (let col = colStart; col <= colEnd; col++) if (tileTypeAt(col, row) === wanted) return true;
   }
-  return ice;
+  return false;
 }
 
 function touchingSpikes(body) {
@@ -59,8 +116,12 @@ function touchingSpikes(body) {
   return false;
 }
 
+function touchingHazard(body) {
+  return bodyTouchesType(body, 'hazard', 0);
+}
+
 function isLadderTile(col, row) {
-  return tileAt(col, row) === 'H';
+  return tileTypeAt(col, row) === 'ladder';
 }
 
 function isLadderTopTile(col, row) {
@@ -73,6 +134,32 @@ function solidAt(x, y) {
 
 function ladderAt(x, y) {
   return isLadderTile(Math.floor(x / tileSize), Math.floor(y / tileSize));
+}
+
+function breakTile(col, row) {
+  if (tileTypeAt(col, row) !== 'breakable') return false;
+  brokenTiles.push({ col, row, ch: levelTiles[row][col] });
+  levelTiles[row][col] = currentStage.brokenTile || '.';
+  spawnEffect('explode', col * tileSize + 8, row * tileSize + 8);
+  playSfx('thud');
+  return true;
+}
+
+function breakTilesInBox(box) {
+  let broken = false;
+  const colStart = Math.floor(box.left / tileSize);
+  const colEnd = Math.floor((box.right - 0.01) / tileSize);
+  const rowStart = Math.floor(box.top / tileSize);
+  const rowEnd = Math.floor((box.bottom - 0.01) / tileSize);
+  for (let row = rowStart; row <= rowEnd; row++) {
+    for (let col = colStart; col <= colEnd; col++) if (breakTile(col, row)) broken = true;
+  }
+  return broken;
+}
+
+function restoreBrokenTiles() {
+  for (const tile of brokenTiles) levelTiles[tile.row][tile.col] = tile.ch;
+  brokenTiles.length = 0;
 }
 
 function roomAtPoint(x, y) {
@@ -94,6 +181,12 @@ function cameraTargetFor(room, focusX) {
   const bounds = roomBounds(room);
   const x = Math.max(bounds.left, Math.min(bounds.right - screenWidth, Math.round(focusX - screenWidth / 2)));
   return { x, y: bounds.top };
+}
+
+function landsOnTopTile(col, row, previousBottom, options) {
+  if (options && options.ignoreLadders) return false;
+  if (!isLadderTopTile(col, row) && !isOneWayTile(col, row)) return false;
+  return previousBottom <= row * tileSize + 0.01;
 }
 
 function moveBody(body, dx, dy, options) {
@@ -135,11 +228,8 @@ function moveBody(body, dx, dy, options) {
     if (dy > 0) {
       const row = Math.floor((body.y - 0.01) / tileSize);
       for (let col = colStart; col <= colEnd; col++) {
-        const tileTop = row * tileSize;
-        const solid = isSolidTile(col, row);
-        const ladderTop = !(options && options.ignoreLadders) && isLadderTopTile(col, row) && previousBottom <= tileTop + 0.01;
-        if (solid || ladderTop) {
-          body.y = tileTop;
+        if (isSolidTile(col, row) || landsOnTopTile(col, row, previousBottom, options)) {
+          body.y = row * tileSize;
           result.landed = true;
           break;
         }
@@ -165,7 +255,7 @@ function isStandingOn(body) {
   const colStart = Math.floor((body.x - halfWidth) / tileSize);
   const colEnd = Math.floor((body.x + halfWidth - 0.01) / tileSize);
   for (let col = colStart; col <= colEnd; col++) {
-    if (isSolidTile(col, row) || isLadderTopTile(col, row)) return true;
+    if (isSolidTile(col, row) || isLadderTopTile(col, row) || isOneWayTile(col, row)) return true;
   }
   return false;
 }
@@ -182,26 +272,45 @@ function boxBlockedAbove(x, y, w, h) {
   return false;
 }
 
-function drawTiles(ctx) {
+function tileSpriteName(col, row) {
   const theme = currentStage;
+  const ch = tileAt(col, row);
+  const frames = theme.tileFrames && theme.tileFrames[ch];
+  if (frames) return frames.names[Math.floor((game.timer + col * (frames.stagger || 0)) / frames.rate) % frames.names.length];
+  if (theme.groundTop[ch] && !isSolidTile(col, row - 1) && tileAt(col, row - 1) !== 'H' && !isOneWayTile(col, row - 1)) return theme.groundTop[ch];
+  return theme.tiles[ch];
+}
+
+function drawTileAt(ctx, col, row, screenX, screenY) {
+  const ch = tileAt(col, row);
+  if (ch === '.') return;
+  if (ch === 'D') {
+    drawDoorTile(ctx, col, row, screenX, screenY);
+    return;
+  }
+  const name = tileSpriteName(col, row);
+  if (!name) return;
+  const palette = (currentStage.tilePalettes && currentStage.tilePalettes[ch]) || currentStage.tilePalette;
+  drawSprite(ctx, name, screenX, screenY, false, palette);
+}
+
+function drawTiles(ctx) {
   const colStart = Math.floor(camera.x / tileSize);
   const colEnd = Math.floor((camera.x + screenWidth - 1) / tileSize);
   const rowStart = Math.floor(camera.y / tileSize);
   const rowEnd = Math.floor((camera.y + screenHeight - 1) / tileSize);
   for (let row = rowStart; row <= rowEnd; row++) {
-    for (let col = colStart; col <= colEnd; col++) {
-      const ch = tileAt(col, row);
-      if (ch === '.') continue;
-      const screenX = col * tileSize - camera.x;
-      const screenY = row * tileSize - camera.y;
-      if (ch === 'D') {
-        drawDoorTile(ctx, col, row, screenX, screenY);
-        continue;
-      }
-      let name = theme.tiles[ch];
-      if (theme.groundTop[ch] && !isSolidTile(col, row - 1) && tileAt(col, row - 1) !== 'H') name = theme.groundTop[ch];
-      if (name) drawSprite(ctx, name, screenX, screenY, false, theme.tilePalette);
-    }
+    for (let col = colStart; col <= colEnd; col++) drawTileAt(ctx, col, row, col * tileSize - camera.x, row * tileSize - camera.y);
+  }
+}
+
+function drawRoomSkies(ctx) {
+  const view = { left: camera.x, top: camera.y, right: camera.x + screenWidth, bottom: camera.y + screenHeight };
+  for (const room of rooms) {
+    const bounds = roomBounds(room);
+    if (bounds.right <= view.left || bounds.left >= view.right || bounds.bottom <= view.top || bounds.top >= view.bottom) continue;
+    ctx.fillStyle = nesPalette[room.sky !== undefined ? room.sky : currentStage.sky];
+    ctx.fillRect(bounds.left - camera.x, bounds.top - camera.y, bounds.right - bounds.left, bounds.bottom - bounds.top);
   }
 }
 

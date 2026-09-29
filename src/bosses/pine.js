@@ -176,7 +176,6 @@ bossDefs.pine = {
   contactDamage: 4,
   invulnFrames: 20,
   orbPalette: 'orbPine',
-  damage: { axe: 7, cone: 0, needle: 0 },
   portrait: 'pineFace',
   present: { fall: 'pineJump', land: 'pineStand', pose: 'pinePose' },
   spawn: pineSpawn,

@@ -36,9 +36,15 @@
 <script src="src/palette.js"></script>
 <script src="src/sprites.js"></script>
 <script src="src/art/originals.js"></script>
+<script src="src/art/tiles.js"></script>
 <script src="src/art/timberman.js"></script>
 <script src="src/art/pineman.js"></script>
-<script src="src/art/tiles.js"></script>
+<script src="src/art/balloonman.js"></script>
+<script src="src/art/campfireman.js"></script>
+<script src="src/art/hiveman.js"></script>
+<script src="src/art/grizzlyman.js"></script>
+<script src="src/art/anglerman.js"></script>
+<script src="src/art/swordfishman.js"></script>
 <script src="src/art/font.js"></script>
 <script>
 // VARIABLES
@@ -96,8 +102,7 @@ const animations = [
 
 function spritePaletteFor(name) {
   if (/^(mega|select|weaponEnergy|oneUp)/.test(name)) return 'mega';
-  if (/^(timber|axe|pine|cone|needle)/.test(name)) return 'boss';
-  return 'enemy';
+  return artPalettes[name] || 'enemy';
 }
 
 function normalizeFrame(frame) {
@@ -150,7 +155,7 @@ function renderAnimations() {
   const container = document.getElementById('animations');
   container.innerHTML = '';
   animationCells.length = 0;
-  for (const animation of animations) {
+  for (const animation of [...animations, ...artAnimations]) {
     const frames = animation.frames.map(normalizeFrame);
     let width = 0;
     let height = 0;
@@ -190,7 +195,7 @@ function renderAll() {
 
 // INITIALIZATION
 
-for (const group of [megaArtOriginals, selectArtOriginals, effectArtOriginals, itemArtOriginals, enemyArtOriginals, tileArt, tileArtOriginals, bossArt, pineArt]) defineSprites(group);
+defineAllSprites();
 zoomInput.addEventListener('input', renderAll);
 lightInput.addEventListener('change', renderAll);
 renderAll();

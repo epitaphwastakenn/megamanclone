@@ -9,7 +9,7 @@ const game = {
   stars: [],
   snow: [],
   defeated: new Set(),
-  weaponEnergy: { timber: 28, pine: 28 },
+  weaponEnergy: {},
   cursor: { col: 0, row: 1 },
   selectTimer: 0,
   bossId: null,
@@ -35,8 +35,14 @@ const stage = {
 };
 
 const selectSlots = [
+  { col: 0, row: 0, boss: 'balloon' },
+  { col: 1, row: 0, boss: 'campfire' },
+  { col: 2, row: 0, boss: 'hive' },
   { col: 0, row: 1, boss: 'timber' },
   { col: 2, row: 1, boss: 'pine' },
+  { col: 0, row: 2, boss: 'grizzly' },
+  { col: 1, row: 2, boss: 'angler' },
+  { col: 2, row: 2, boss: 'swordfish' },
 ];
 
 // FUNCTIONS
@@ -140,10 +146,12 @@ function startStage(checkpointIndex) {
   const checkpoint = checkpoints[checkpointIndex];
   stage.room = rooms.find(room => room.id === checkpoint.room);
   for (const key in doors) doors[key].openAmount = 0;
+  restoreBrokenTiles();
   resetSpawns();
   resetLevelItems();
   effects.length = 0;
   clearBoss();
+  clearPlatforms();
   stage.fills = [];
   stage.transition = null;
   stage.doorSequence = null;
@@ -156,6 +164,8 @@ function startStage(checkpointIndex) {
   const target = cameraTargetFor(stage.room, x);
   camera.x = target.x;
   camera.y = target.y;
+  spawnRoomPlatforms(stage.room.id);
+  if (currentStage.onStart) currentStage.onStart();
   if (currentStage.snow) makeSnow();
   stage.state = 'ready';
   stage.timer = 0;
@@ -201,8 +211,14 @@ function updateStage() {
   }
 }
 
+function updateStageExtras() {
+  if (currentStage.update) currentStage.update();
+  updatePlatforms();
+}
+
 function updateReady() {
   stage.timer++;
+  updateStageExtras();
   updateSpawns(stage.room);
   updateItems();
   if (stage.timer === 120) {
@@ -245,6 +261,7 @@ function updatePlay() {
     openPause();
     return;
   }
+  updateStageExtras();
   updatePlayer();
   if (stage.state !== 'play') return;
   if (checkRoomTransitions()) return;
@@ -318,6 +335,8 @@ function startTransition(room, direction) {
   const target = cameraTargetFor(room, player.x);
   stage.transition = { room, direction, fromX: camera.x, fromY: camera.y, toX: target.x, toY: target.y, timer: 0, frames: 64 };
   stage.state = 'transition';
+  player.platform = null;
+  spawnRoomPlatforms(room.id);
 }
 
 function updateTransition() {
@@ -341,7 +360,9 @@ function updateTransition() {
     stage.transition = null;
     stage.state = 'play';
     for (const spawn of levelSpawns) if (spawn.room === stage.room.id) spawn.state = 'ready';
+    keepRoomPlatforms(stage.room.id);
     updateCheckpoint();
+    if (currentStage.onRoomEnter) currentStage.onRoomEnter(stage.room);
   }
 }
 
@@ -396,6 +417,7 @@ function updateDoorSequence() {
       sequence.fromX = camera.x;
       sequence.toX = target.x;
       stage.room = sequence.next;
+      spawnRoomPlatforms(stage.room.id);
       if (stage.room.boss) stopSong();
     }
   } else if (sequence.phase === 'scroll') {
@@ -413,7 +435,9 @@ function updateDoorSequence() {
     if (sequence.timer % 6 === 0) setDoorsOpen(sequence, Math.max(0, openAmount - 16));
     if (openAmount <= 0 && sequence.timer > 26) {
       stage.doorSequence = null;
+      keepRoomPlatforms(stage.room.id);
       updateCheckpoint();
+      if (currentStage.onRoomEnter) currentStage.onRoomEnter(stage.room);
       for (const spawn of levelSpawns) if (spawn.room === stage.room.id) spawn.state = 'ready';
       if (stage.room.boss && !stage.bossDefeated) {
         stage.state = 'bossIntro';
@@ -429,13 +453,15 @@ function updateDoorSequence() {
 function updateBossIntro() {
   const intro = stage.bossPhase;
   intro.timer++;
+  updateStageExtras();
   updatePlayer();
   updateBoss(false);
   updateEffects();
   if (intro.phase === 'wait') {
     if (intro.timer >= 40) {
       const bounds = currentRoomBounds();
-      spawnBoss(currentStage.boss, bounds.left + 12 * tileSize, bounds.top + 40);
+      const spot = currentStage.bossSpawn || { col: 12, y: 40 };
+      spawnBoss(currentStage.boss, bounds.left + spot.col * tileSize, bounds.top + spot.y);
       intro.phase = 'drop';
       intro.timer = 0;
     }
@@ -548,8 +574,11 @@ function updateVictory() {
 function drawStage(ctx) {
   ctx.fillStyle = nesPalette[currentStage.sky];
   ctx.fillRect(0, 0, screenWidth, screenHeight);
+  drawRoomSkies(ctx);
+  if (currentStage.drawBackground) currentStage.drawBackground(ctx);
   if (currentStage.snow) drawSnow(ctx);
   drawTiles(ctx);
+  drawPlatforms(ctx);
   drawItems(ctx);
   drawEnemies(ctx);
   drawBoss(ctx);
@@ -557,6 +586,7 @@ function drawStage(ctx) {
   drawPlayerShots(ctx);
   drawEnemyShots(ctx);
   drawEffects(ctx);
+  if (currentStage.drawForeground) currentStage.drawForeground(ctx);
   if (stage.state !== 'ready' || stage.timer > 120) drawHud(ctx);
   if (stage.state === 'ready' && stage.timer < 120 && Math.floor(stage.timer / 15) % 2 === 0) {
     drawTextCentered(ctx, 'READY', screenWidth / 2, 112, nesPalette[0x30]);
@@ -566,22 +596,23 @@ function drawStage(ctx) {
 
 function drawPauseMenu(ctx) {
   const owned = ownedWeapons();
-  const height = 56 + owned.length * 22;
+  const rowHeight = 18;
+  const height = 42 + owned.length * rowHeight;
   const top = Math.floor((screenHeight - height) / 2);
   drawPanel(ctx, 40, top, 176, height);
   owned.forEach((id, index) => {
     const def = weaponDefs[id];
-    const y = top + 14 + index * 22;
+    const y = top + 10 + index * rowHeight;
     const selected = index === stage.pauseCursor;
     if (selected && Math.floor(game.timer / 8) % 2 === 0) drawText(ctx, '>', 52, y, nesPalette[0x30]);
     drawText(ctx, def.label, 64, y, selected ? nesPalette[0x30] : nesPalette[0x10]);
     const value = id === 'buster' ? player.health : game.weaponEnergy[id];
-    drawEnergyBarWide(ctx, 64, y + 10, value, weaponMaxEnergy, def.barColors);
+    drawEnergyBarWide(ctx, 64, y + 9, value, weaponMaxEnergy, def.barColors);
   });
-  const bottom = top + height - 34;
-  drawSprite(ctx, 'oneUp', 80, bottom + 16, false, weaponDefs[owned[stage.pauseCursor]].palette);
-  drawText(ctx, 'X ' + game.lives, 96, bottom + 5, nesPalette[0x30]);
-  drawText(ctx, 'PAUSE', 144, bottom + 5, nesPalette[0x28]);
+  const bottom = top + height - 30;
+  drawSprite(ctx, 'oneUp', 80, bottom + 18, false, weaponDefs[owned[stage.pauseCursor]].palette);
+  drawText(ctx, 'X ' + game.lives, 96, bottom + 8, nesPalette[0x30]);
+  drawText(ctx, 'PAUSE', 144, bottom + 8, nesPalette[0x28]);
 }
 
 function newGame() {
@@ -595,7 +626,7 @@ function openStageSelect() {
   setScene('stageSelect');
   game.selectTimer = 0;
   const current = slotAt(game.cursor.col, game.cursor.row);
-  const next = selectSlots.find(slot => !game.defeated.has(slot.boss));
+  const next = selectSlots.find(slot => bossDefs[slot.boss] && !game.defeated.has(slot.boss));
   if (current && game.defeated.has(current.boss) && next) game.cursor = { col: next.col, row: next.row };
   makeStars();
   playSong(stageSelectSong);
@@ -639,6 +670,13 @@ function drawTitle(ctx) {
   drawTextCentered(ctx, 'ENTER PAUSA   M SOM', screenWidth / 2, 226, nesPalette[0x00]);
 }
 
+function drawBossName(ctx, name, centerX, y, color) {
+  const parts = name.split(' ');
+  const last = parts.pop();
+  drawTextCentered(ctx, parts.join(' '), centerX, y, color);
+  drawTextCentered(ctx, last, centerX, y + 8, color);
+}
+
 function slotAt(col, row) {
   return selectSlots.find(slot => slot.col === col && slot.row === row) || null;
 }
@@ -674,7 +712,7 @@ function updateStageSelect() {
   else if (input.pressed.down) moveSelectCursor(0, 1);
   if (input.pressed.start || input.pressed.jump || input.pressed.fire) {
     const slot = slotAt(game.cursor.col, game.cursor.row);
-    if (!slot || game.defeated.has(slot.boss)) {
+    if (!slot || !bossDefs[slot.boss] || !stageDefs[bossDefs[slot.boss].stage] || game.defeated.has(slot.boss)) {
       playSfx('error');
       return;
     }
@@ -694,7 +732,7 @@ function drawStageSelect(ctx) {
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < 3; col++) {
       const x = 24 + col * 80;
-      const y = 24 + row * 64;
+      const y = 20 + row * 68;
       const selected = cursor.col === col && cursor.row === row;
       ctx.fillStyle = nesPalette[0x0F];
       ctx.fillRect(x + 4, y + 4, 40, 40);
@@ -710,11 +748,15 @@ function drawStageSelect(ctx) {
         continue;
       }
       const def = bossDefs[slot.boss];
-      if (!game.defeated.has(slot.boss)) drawSprite(ctx, def.portrait, x + 8, y + 8, false, 'boss');
-      drawTextCentered(ctx, def.name, x + 24, y + 52, game.defeated.has(slot.boss) ? nesPalette[0x2D] : nesPalette[0x30]);
+      if (!def) {
+        drawTextCentered(ctx, '?', x + 24, y + 20, nesPalette[0x2D]);
+        continue;
+      }
+      if (!game.defeated.has(slot.boss)) drawSprite(ctx, def.portrait, x + 8, y + 8, false, def.palette || 'boss');
+      drawBossName(ctx, def.name, x + 24, y + 49, game.defeated.has(slot.boss) ? nesPalette[0x2D] : nesPalette[0x30]);
     }
   }
-  if (game.selectTimer === 0 && Math.floor(game.timer / 20) % 2 === 0) drawTextCentered(ctx, 'PUSH START', screenWidth / 2, 222, nesPalette[0x30]);
+  if (game.selectTimer === 0 && Math.floor(game.timer / 20) % 2 === 0) drawTextCentered(ctx, 'PUSH START', screenWidth / 2, 226, nesPalette[0x30]);
 }
 
 function updateBossPresent() {
@@ -757,7 +799,7 @@ function drawBossPresent(ctx) {
     const since = game.timer - present.landTime;
     pose = since < 16 ? def.present.land : since < 40 ? def.present.pose : Math.floor(since / 12) % 3 === 1 ? def.present.land : def.present.pose;
   }
-  drawSprite(ctx, pose, screenWidth / 2, present.y, false, 'boss');
+  drawSprite(ctx, pose, screenWidth / 2, present.y, false, def.palette || 'boss');
   if (present.landed) {
     const count = Math.max(0, Math.min(def.name.length, Math.floor((game.timer - present.landTime - 30) / 6) + 1));
     drawText(ctx, def.name.slice(0, count), screenWidth / 2 - def.name.length * 4, 172, nesPalette[0x30]);
@@ -770,7 +812,7 @@ function updateWeaponGet() {
   if (game.timer > 240 && (input.pressed.start || input.pressed.jump)) {
     startFade(() => {
       stopSong();
-      if (selectSlots.every(slot => game.defeated.has(slot.boss))) {
+      if (selectSlots.every(slot => game.defeated.has(slot.boss) || !bossDefs[slot.boss])) {
         setScene('ending');
         makeStars();
         playSong(titleSong);
@@ -795,9 +837,10 @@ function drawWeaponGet(ctx) {
   const typedTwo = Math.max(0, Math.min(lineTwo.length, Math.floor((game.timer - 90) / 5)));
   drawText(ctx, lineOne.slice(0, typedOne), 120, 92, nesPalette[0x30]);
   drawText(ctx, lineTwo.slice(0, typedTwo), 120, 108, nesPalette[0x30]);
-  if (game.timer > 170) {
-    const frame = Math.floor(game.timer / 4) % 4;
-    drawSpriteScaled(ctx, (game.weaponId === 'timber' ? 'axeSmall' : 'cone') + frame, 164, 146, false, 'boss', 2);
+  if (game.timer > 170 && def.icon) {
+    const icon = def.icon;
+    const frame = icon.frames[Math.floor(game.timer / (icon.rate || 4)) % icon.frames.length];
+    drawSpriteScaled(ctx, frame, 164, 146, false, icon.palette || 'boss', 2);
   }
   if (game.timer > 240 && Math.floor(game.timer / 20) % 2 === 0) drawTextCentered(ctx, 'PRESS START', screenWidth / 2, 200, nesPalette[0x30]);
   if (game.timer > 20 && game.timer < 150 && game.timer % 5 === 0) playSfx('blip');
@@ -820,21 +863,25 @@ function drawEnding(ctx) {
   ctx.fillStyle = nesPalette[0x0F];
   ctx.fillRect(0, 0, screenWidth, screenHeight);
   drawStars(ctx, 0, screenHeight);
-  drawTextCentered(ctx, 'CONGRATULATIONS!', screenWidth / 2, 24, nesPalette[0x28]);
+  drawTextCentered(ctx, 'CONGRATULATIONS!', screenWidth / 2, 10, nesPalette[0x28]);
+  const revealed = Math.floor(game.timer / 10);
+  const spotlight = revealed > selectSlots.length ? Math.floor((game.timer - selectSlots.length * 10) / 45) % selectSlots.length : revealed - 1;
   selectSlots.forEach((slot, index) => {
-    const x = 40 + index * 128;
+    const def = bossDefs[slot.boss];
+    if (!def) return;
+    const x = 16 + (index % 4) * 60;
+    const y = 26 + Math.floor(index / 4) * 58;
     ctx.fillStyle = nesPalette[0x0F];
-    ctx.fillRect(x + 4, 44, 40, 40);
-    drawSprite(ctx, 'selectPanel0', x, 40, false, 'mega');
-    drawSprite(ctx, bossDefs[slot.boss].portrait, x + 8, 48, false, 'boss');
-    drawTextCentered(ctx, bossDefs[slot.boss].name, x + 24, 92, nesPalette[0x30]);
+    ctx.fillRect(x + 4, y + 4, 40, 40);
+    drawSprite(ctx, index === spotlight ? 'selectPanel1' : 'selectPanel0', x, y, false, 'mega');
+    if (revealed > index) drawSprite(ctx, def.portrait, x + 8, y + 8, false, def.palette || 'boss');
   });
-  const pose = Math.floor(game.timer / 6) % 40 === 0 ? 'megaBlink' : 'megaStand';
-  drawSpriteScaled(ctx, pose, screenWidth / 2, 104, false, 'mega', 2);
-  if (game.timer > 60) drawTextCentered(ctx, 'THE ROBOT MASTERS', screenWidth / 2, 124, nesPalette[0x30]);
-  if (game.timer > 90) drawTextCentered(ctx, 'HAVE BEEN DEFEATED!', screenWidth / 2, 136, nesPalette[0x30]);
-  if (game.timer > 150) drawTextCentered(ctx, 'THANK YOU FOR PLAYING', screenWidth / 2, 168, nesPalette[0x2C]);
-  if (game.timer > 240 && Math.floor(game.timer / 20) % 2 === 0) drawTextCentered(ctx, 'PRESS START', screenWidth / 2, 200, nesPalette[0x30]);
+  const spotlightDef = spotlight >= 0 && bossDefs[selectSlots[spotlight].boss];
+  if (spotlightDef) drawTextCentered(ctx, spotlightDef.name, screenWidth / 2, 148, nesPalette[0x28]);
+  if (game.timer > 90) drawTextCentered(ctx, 'THE ROBOT MASTERS', screenWidth / 2, 170, nesPalette[0x30]);
+  if (game.timer > 120) drawTextCentered(ctx, 'HAVE BEEN DEFEATED!', screenWidth / 2, 182, nesPalette[0x30]);
+  if (game.timer > 180) drawTextCentered(ctx, 'THANK YOU FOR PLAYING', screenWidth / 2, 204, nesPalette[0x2C]);
+  if (game.timer > 240 && Math.floor(game.timer / 20) % 2 === 0) drawTextCentered(ctx, 'PRESS START', screenWidth / 2, 224, nesPalette[0x30]);
 }
 
 function updateGameOver() {

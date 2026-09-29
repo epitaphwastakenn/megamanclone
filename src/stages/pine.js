@@ -51,7 +51,7 @@ function buildPineStage() {
   b1.fill(2, 6, 3, 1, 'I');
   b1.fill(11, 10, 3, 1, 'I');
   b1.fill(10, 11, 4, 1, '#');
-  b1.fill(2, 13, 2, 2, '^');
+  b1.fill(2, 13, 2, 2, '#');
   b1.spawn('flea', 3, 6);
   b1.spawn('flea', 12, 10);
   b1.item('energySmall', 3, 6);
@@ -61,9 +61,7 @@ function buildPineStage() {
   b2.fill(14, 0, 2, 15, '#');
   b2.back(2, 0, 12, 15, 'c');
   b2.fill(2, 4, 4, 1, '#');
-  b2.fill(2, 3, 1, 1, '^');
   b2.fill(10, 8, 4, 1, 'I');
-  b2.fill(13, 7, 1, 1, '^');
   b2.spawn('pengs', 8, 3);
   b2.item('weaponBig', 11, 8);
 
@@ -75,9 +73,9 @@ function buildPineStage() {
   c.fill(20, 12, 14, 3, 'I');
   c.fill(26, 10, 2, 2, 'I');
   c.fill(34, 14, 12, 1, '^');
-  c.fill(36, 10, 2, 1, 'I');
-  c.fill(40, 10, 2, 1, 'I');
-  c.fill(44, 11, 1, 1, 'I');
+  c.fill(36, 10, 2, 1, '#');
+  c.fill(40, 10, 2, 1, '#');
+  c.fill(44, 11, 1, 1, '#');
   c.fill(46, 12, 6, 3, '#');
   c.fill(52, 10, 8, 5, '#');
   c.fill(60, 12, 4, 3, 'I');

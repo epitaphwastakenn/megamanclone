@@ -2,6 +2,9 @@
 
 const spriteDefs = {};
 const spriteCache = new Map();
+const artGroups = [];
+const artPalettes = {};
+const artAnimations = [];
 
 // FUNCTIONS
 
@@ -15,6 +18,19 @@ function defineSprite(name, rows, ox, oy) {
     ox: ox === undefined ? Math.floor(width / 2) : ox,
     oy: oy === undefined ? height : oy,
   };
+}
+
+function registerArt(group, paletteName) {
+  artGroups.push(group);
+  if (paletteName) for (const name in group) artPalettes[name] = paletteName;
+}
+
+function registerAnimations(list) {
+  artAnimations.push(...list);
+}
+
+function defineAllSprites() {
+  for (const group of artGroups) defineSprites(group);
 }
 
 function defineSprites(group) {
