@@ -21,8 +21,12 @@ function scanFile(file, found) {
     const where = file + ':' + (index + 1);
     const declaration = /^(?:async )?function (\w+)\(|^(?:const|let|var) (\w+)/.exec(line);
     if (declaration) (found['global ' + (declaration[1] || declaration[2])] ||= []).push(where);
-    const assign = /^Object\.assign\((\w+), \{/.exec(line);
+    const assign = /^Object\.assign\((\w+), \{(.*)$/.exec(line);
     if (assign && registries.includes(assign[1])) {
+      if (assign[2].includes('});')) {
+        for (const inline of assign[2].matchAll(/(\w+|'[^']+'): /g)) (found[assign[1] + '.' + inline[1].replace(/'/g, '')] ||= []).push(where);
+        return;
+      }
       registry = assign[1];
       return;
     }
