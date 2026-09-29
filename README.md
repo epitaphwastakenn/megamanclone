@@ -73,7 +73,7 @@ As fases têm itens opcionais que só as armas de outros chefes alcançam (bloco
 - **Hive Man**: campo de flores gigantes num dia de sol. Pétalas servem de plataforma, o chão de mel deixa lento e há uma árvore oca com favos e gotas de mel que incham antes de cair. Sementes de dente-de-leão fazem de elevador, e uma colmeia gigante guarda o chefe.
 - **Grizzly Man**: floresta de pinheiros e cachoeira com poço raso onde robo-salmões saltam, um tronco flutuante, poço de escadas até a caverna e estalactites que tremem antes de cair. Blocos rachados escondem 1-UP, energia e um túnel-atalho (só com a Grizzly Claw).
 - **Angler Man**: lago ao amanhecer com névoa e montanhas refletidas. Píeres, barcos a remo que servem de plataforma, uma casa de barcos com elevador de barco e sótão, e peixes que saltam da água com aviso de bolhas. Um 1-UP e uma energia de arma ficam sobre a água, só alcançáveis com o Lure Hook.
-- **Swordfish Man**: praia e píer com um naufrágio, depois o fundo do mar com recifes de coral, floresta de algas, correntezas que empurram (bolhas mostram a direção) e o interior de um galeão afundado.
+- **Swordfish Man**: praia ensolarada com coqueiros e um píer onde a física da água é apresentada com segurança. Depois vêm um navio pirata naufragado (com um 1-UP no mastro que só o Sword Dash alcança), o mergulho por poços de recife, a floresta de algas com correnteza (bolhas e traços mostram a direção) e o interior escuro de um galeão afundado.
 
 Cada fase apresenta sua mecânica principal com segurança antes de combiná-la com inimigos. A regra de level design é que nenhum dano seja inevitável:
 
@@ -90,7 +90,7 @@ Cada fase apresenta sua mecânica principal com segurança antes de combiná-la 
 - **Hive Man**: Bee Drone, colmeia que solta drones, Ladybug Tank (casco que reflete tiros) e Seed Flower (cospe sementes em arco).
 - **Grizzly Man**: robo-marmota, morcego da caverna, robô que empurra pedregulhos, robo-salmão e estalactites.
 - **Angler Man**: peixe-robô saltador, pelicano drone que solta boias-bomba e caranguejo robô com garras de escudo.
-- **Swordfish Man**: águas-vivas, cardumes de piranhas-robô, caranguejos-eremitas com concha-escudo e peixes-lanterna no galeão.
+- **Swordfish Man**: água-viva robô (solta um anel elétrico depois de piscar), cardume de piranhas-robô, piranha saltadora, caranguejo-eremita que se esconde na concha e peixe-lanterna no galeão escuro.
 
 ## O resto do jogo
 

@@ -864,21 +864,22 @@ function drawEnding(ctx) {
   ctx.fillRect(0, 0, screenWidth, screenHeight);
   drawStars(ctx, 0, screenHeight);
   drawTextCentered(ctx, 'CONGRATULATIONS!', screenWidth / 2, 10, nesPalette[0x28]);
+  const revealed = Math.floor(game.timer / 10);
+  const spotlight = revealed > selectSlots.length ? Math.floor((game.timer - selectSlots.length * 10) / 45) % selectSlots.length : revealed - 1;
   selectSlots.forEach((slot, index) => {
     const def = bossDefs[slot.boss];
     if (!def) return;
     const x = 16 + (index % 4) * 60;
-    const y = 26 + Math.floor(index / 4) * 70;
-    const shown = Math.floor(game.timer / 10) > index;
+    const y = 26 + Math.floor(index / 4) * 58;
     ctx.fillStyle = nesPalette[0x0F];
     ctx.fillRect(x + 4, y + 4, 40, 40);
-    drawSprite(ctx, 'selectPanel0', x, y, false, 'mega');
-    if (!shown) return;
-    drawSprite(ctx, def.portrait, x + 8, y + 8, false, def.palette || 'boss');
-    drawBossName(ctx, def.name, x + 24, y + 50, nesPalette[0x30]);
+    drawSprite(ctx, index === spotlight ? 'selectPanel1' : 'selectPanel0', x, y, false, 'mega');
+    if (revealed > index) drawSprite(ctx, def.portrait, x + 8, y + 8, false, def.palette || 'boss');
   });
-  if (game.timer > 90) drawTextCentered(ctx, 'THE ROBOT MASTERS', screenWidth / 2, 172, nesPalette[0x30]);
-  if (game.timer > 120) drawTextCentered(ctx, 'HAVE BEEN DEFEATED!', screenWidth / 2, 184, nesPalette[0x30]);
+  const spotlightDef = spotlight >= 0 && bossDefs[selectSlots[spotlight].boss];
+  if (spotlightDef) drawTextCentered(ctx, spotlightDef.name, screenWidth / 2, 148, nesPalette[0x28]);
+  if (game.timer > 90) drawTextCentered(ctx, 'THE ROBOT MASTERS', screenWidth / 2, 170, nesPalette[0x30]);
+  if (game.timer > 120) drawTextCentered(ctx, 'HAVE BEEN DEFEATED!', screenWidth / 2, 182, nesPalette[0x30]);
   if (game.timer > 180) drawTextCentered(ctx, 'THANK YOU FOR PLAYING', screenWidth / 2, 204, nesPalette[0x2C]);
   if (game.timer > 240 && Math.floor(game.timer / 20) % 2 === 0) drawTextCentered(ctx, 'PRESS START', screenWidth / 2, 224, nesPalette[0x30]);
 }
