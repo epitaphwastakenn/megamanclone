@@ -1,7 +1,7 @@
 // FUNCTIONS
 
 function campfireSpawn(boss) {
-  Object.assign(boss.ai, { action: 'stand', timer: 40, tosses: 0, blink: 0, anim: 0, rained: false, scattered: false, shake: 0, smotherCooldown: 0 });
+  Object.assign(boss.ai, { action: 'stand', timer: 40, tosses: 0, blink: 0, anim: 0, rained: false, scattered: false, shake: 0, smotherCooldown: 0, dodge: 60 });
 }
 
 function campfireFloorFires() {
@@ -50,6 +50,18 @@ function campfireLightFire(x, groundY) {
   campfireSound('ignite');
 }
 
+function campfireHop() {
+  const bounds = currentRoomBounds();
+  const away = player.x < boss.x ? 1 : -1;
+  const room = away > 0 ? bounds.right - 32 - boss.x : boss.x - bounds.left - 32;
+  boss.vy = -4.6;
+  boss.vx = (room > 40 ? away : -away) * 1.3;
+  boss.onGround = false;
+  boss.ai.dodge = 110;
+  campfireSetAction('hop', 0);
+  playSfx('jumpBig');
+}
+
 function campfireStartRain() {
   const bounds = currentRoomBounds();
   const center = (bounds.left + bounds.right) / 2;
@@ -78,11 +90,18 @@ function campfireUpdate(boss) {
   ai.anim++;
   if (ai.shake > 0) ai.shake--;
   if (ai.smotherCooldown > 0) ai.smotherCooldown--;
+  if (ai.dodge > 0) ai.dodge--;
   ai.timer--;
   if (ai.action === 'stand') {
     boss.vx = 0;
     bossFacePlayer();
-    if (ai.timer <= 0) campfireChooseAction();
+    if (stageEvents.playerFired && ai.dodge <= 0 && ai.timer > 8 && Math.random() < 0.3) campfireHop();
+    else if (ai.timer <= 0) campfireChooseAction();
+  } else if (ai.action === 'hop') {
+    if (boss.onGround && ai.anim > 2) {
+      boss.vx = 0;
+      campfireSetAction('stand', 14);
+    }
   } else if (ai.action === 'windup') {
     boss.vx = 0;
     if (ai.timer % 8 === 0) spawnEffect('campfireSpark', boss.x - boss.facing * 6, boss.y - 40, { vx: 0, vy: -0.8 });
@@ -199,7 +218,7 @@ function updateCampfireFire(shot) {
     campfirePuff(shot.x, shot.y - 6);
     return false;
   }
-  if (shot.age % 9 === 0) spawnEffect('campfireSpark', shot.x + (Math.random() - 0.5) * 8, campfireFireBox(shot.x, shot.y, shot.age, shot.life).top + 2, { vx: (Math.random() - 0.5) * 0.6, vy: -0.8 });
+  if (shot.age % 9 === 0) spawnEffect('campfireSpark', shot.x + (Math.random() - 0.5) * 8, shot.y - campfireFireHeight(shot.age, shot.life) + 2, { vx: (Math.random() - 0.5) * 0.6, vy: -0.8 });
   return true;
 }
 

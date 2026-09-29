@@ -325,7 +325,8 @@ function buildCampfireStage() {
   c.back(50, 9, 1, 6, '|');
   c.fill(51, 8, 5, 7, '#');
   c.back(53, 7, 1, 1, 's');
-  c.fill(56, 12, 24, 3, '#');
+  c.fill(56, 12, 3, 3, '#');
+  c.fill(59, 12, 21, 3, 'P');
   c.fill(57, 0, 23, 3, 'R');
   c.fill(58, 3, 1, 7, 'L');
   c.fill(79, 3, 1, 5, 'L');
@@ -344,7 +345,7 @@ function buildCampfireStage() {
   const d = paintRoom('D');
   d.fill(0, 0, 16, 3, 'R');
   d.fill(0, 3, 16, 5, 'L');
-  d.fill(0, 12, 16, 3, '#');
+  d.fill(0, 12, 16, 3, 'P');
   d.fill(0, 8, 1, 4, 'D');
   d.fill(15, 8, 1, 4, 'D');
   d.back(4, 9, 1, 1, 'o');
@@ -441,6 +442,7 @@ stageDefs.campfire = {
   tiles: {
     '#': 'tileCampDirt',
     S: 'tileCampStone',
+    P: 'tileCampFloor',
     L: 'tileCampLogWall',
     R: 'tileCampRoof',
     '-': 'tileCampPlank',
@@ -468,7 +470,7 @@ stageDefs.campfire = {
     '~': { names: ['tileCampLights0', 'tileCampLights1'], rate: 24, stagger: 24 },
   },
   groundTop: { '#': 'tileCampGrass' },
-  tileTypes: { S: 'solid', L: 'solid', R: 'solid', k: 'solid', f: 'solid', F: 'solid', '-': 'oneWay', T: 'oneWay', U: 'oneWay' },
+  tileTypes: { S: 'solid', P: 'solid', L: 'solid', R: 'solid', k: 'solid', f: 'solid', F: 'solid', '-': 'oneWay', T: 'oneWay', U: 'oneWay' },
   onStart: startCampfireStage,
   update: updateCampfireStage,
   drawBackground: drawCampfireBackground,

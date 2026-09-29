@@ -37,6 +37,7 @@ function campfireDrawFire(ctx, sx, sy, age, life) {
 }
 
 function campfireFireBox(x, groundY, age, life) {
+  if (life - age < 24) return { left: 0, top: 0, right: 0, bottom: 0 };
   const height = campfireFireHeight(age, life);
   return { left: x - 6, top: groundY - height, right: x + 6, bottom: groundY };
 }

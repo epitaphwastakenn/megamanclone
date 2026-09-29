@@ -57,10 +57,11 @@ function updateCampFlame(shot) {
     campfirePuff(shot.x, shot.groundY - 8);
     return false;
   }
+  const height = campfireFireHeight(shot.age, shot.life);
   const box = campfireFireBox(shot.x, shot.groundY, shot.age, shot.life);
-  shot.y = (box.top + box.bottom) / 2;
-  shot.h = box.bottom - box.top;
-  if (shot.age % 7 === 0) spawnEffect('campfireSpark', shot.x + (Math.random() - 0.5) * 8, box.top + 2, { vx: (Math.random() - 0.5) * 0.6, vy: -0.8 });
+  shot.y = shot.groundY - height / 2;
+  shot.h = height;
+  if (shot.age % 7 === 0) spawnEffect('campfireSpark', shot.x + (Math.random() - 0.5) * 8, shot.groundY - height + 2, { vx: (Math.random() - 0.5) * 0.6, vy: -0.8 });
   burnEnemies(shot, box);
   burnBoss(shot, box);
   burnProjectiles(box);
