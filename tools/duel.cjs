@@ -7,6 +7,7 @@ const root = path.resolve(__dirname, '..');
 const bossId = process.argv[2];
 const weaponId = process.argv[3] || 'buster';
 const seed = Number(process.argv[4] || 7);
+const approach = process.argv[5] === 'approach';
 
 // FUNCTIONS
 
@@ -16,7 +17,7 @@ async function runDuel() {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message + '\n' + (error.stack || '')));
   await page.goto('file://' + path.join(root, 'index.html'));
-  const result = await page.evaluate(([id, weapon, randomSeed]) => {
+  const result = await page.evaluate(([id, weapon, randomSeed, walk]) => {
     let value = randomSeed;
     Math.random = () => {
       value = (value * 1103515245 + 12345) & 0x7fffffff;
@@ -59,7 +60,8 @@ async function runDuel() {
       if (stage.state === 'play' && boss.state === 'fight') {
         if (fightStart === null) fightStart = frames;
         const toward = boss.x < player.x ? 'left' : 'right';
-        if ((toward === 'left') !== (player.facing < 0)) keyboardHeld[toward] = true;
+        if ((toward === 'left') !== (player.facing < 0) || (walk && Math.abs(boss.x - player.x) > 26)) keyboardHeld[toward] = true;
+        if (walk && boss.y < player.y - 20 && frames % 30 === 0) keyboardLatch.jump = true;
         if (frames % 12 === 0) keyboardLatch.fire = true;
         if (game.weaponEnergy[weapon] !== undefined && game.weaponEnergy[weapon] < 4) game.weaponEnergy[weapon] = weaponMaxEnergy;
       }
@@ -79,7 +81,7 @@ async function runDuel() {
       damageTaken,
       hitsTaken: hits,
     };
-  }, [bossId, weaponId, seed]);
+  }, [bossId, weaponId, seed, approach]);
   console.log(JSON.stringify(result));
   if (errors.length) console.log('ERRORS:\n' + errors.join('\n'));
   await browser.close();
