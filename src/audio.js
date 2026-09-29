@@ -267,6 +267,22 @@ function playSfx(name) {
     case 'jumpBig':
       playFrames('jumpBig', 'noise', sweepFrames(8000, 2000, 6, 0.2, 0));
       break;
+    case 'throw':
+      playFrames('throw', 0.25, sweepFrames(420, 1250, 6, 0.26, 0.1));
+      break;
+    case 'burst':
+      playFrames('burst', 'noise', sweepFrames(18000, 2600, 12, 0.36, 0));
+      playFrames('burstTone', 0.125, sweepFrames(2400, 900, 6, 0.18, 0.04));
+      break;
+    case 'skate':
+      playFrames('skate', 'noise', sweepFrames(9000, 5200, 18, 0.2, 0.04));
+      break;
+    case 'error':
+      playFrames('error', 0.5, [[233, 0.28], [233, 0.28], [233, 0.2], [0, 0], [0, 0], [233, 0.28], [233, 0.2], [233, 0.1]]);
+      break;
+    case 'select':
+      playFrames('menu', 0.5, sequenceFrames(['E6', 'G6', 'C7'], 3, 0.28));
+      break;
   }
 }
 

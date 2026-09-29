@@ -90,6 +90,15 @@ function rotateArt(rows) {
   return result;
 }
 
+function mirrorArt(rows) {
+  return rows.map(row => row + row.split('').reverse().join(''));
+}
+
+function trimRight(rows) {
+  const used = Math.max(...rows.map(row => row.replace(/\.+$/, '').length));
+  return rows.map(row => row.slice(0, used));
+}
+
 function drawSprite(ctx, name, x, y, flip, paletteName) {
   const def = spriteDefs[name];
   const canvas = getSpriteCanvas(name, paletteName || 'mega', flip);

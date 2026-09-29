@@ -218,6 +218,58 @@ const axeSpin = [
   '........................',
 ];
 
+const axeSmall = [
+  '..........K...',
+  '.........KWK..',
+  '....KKK.KWWK..',
+  '....KOKKWWKWK.',
+  '....KOKWWWKWK.',
+  '....KOKKWWKWK.',
+  '....KKK.KWWK..',
+  '....KOK..KWK..',
+  '....KOK...K...',
+  '....KOK.......',
+  '....KOK.......',
+  '....KOK.......',
+  '....KKK.......',
+  '..............',
+];
+
+const timberFaceHalf = [
+  '................',
+  '..........OOOOOO',
+  '........OOOOOOOO',
+  '.......OOOOOOOOO',
+  '......OOOOOOOOOO',
+  '.....OOOOOOOOOOO',
+  '.....OOOOOOOOOOO',
+  '.....RRRRRRRRRRR',
+  '.....RRRRRRRRRRR',
+  '...OOOOOOOOOOOOO',
+  '..OOOOOOOOOOOOOO',
+  '................',
+  '....RRRKSSSSSSSS',
+  '.KKKKRRKSSSSSSSS',
+  'KOOOOKRKSRRRRRSS',
+  'KOKKOKRKSWWWWKSS',
+  'KOKKOKRKSWWKKKSS',
+  'KOOOOKRKSWWKKKSS',
+  '.KKKKRRKSSSSSSSS',
+  '...RRRRRSSSSSSSq',
+  '...RRRRRRSSSSSSq',
+  '...RRRRRRRRSSSSS',
+  '...RRRRRRRRRRRRR',
+  '...RRRRRRRRRKKKK',
+  '....RRRRRRRRRRRR',
+  '....RRRRRRRRRRRR',
+  '.....RRRRRRRRRRR',
+  '......RRRRRRRRRR',
+  '..OOOO..KRRRRRRR',
+  '.ORROOO...KRRRRR',
+  'OORRKRRO....KRRR',
+  'ORRKRRROO.....KR',
+];
+
 // FUNCTIONS
 
 function buildTimber(options) {
@@ -241,11 +293,6 @@ function buildTimber(options) {
   return composeArt(34, 27 + top, parts.map(([rows, dx, dy]) => [rows, dx, dy + top]));
 }
 
-function trimRight(rows) {
-  const used = Math.max(...rows.map(row => row.replace(/\.+$/, '').length));
-  return rows.map(row => row.slice(0, used));
-}
-
 // VARIABLES
 
 const bossArt = {
@@ -262,8 +309,13 @@ const bossArt = {
   timberThrow: { ox: 12, rows: trimRight(buildTimber({ arm: 'throw', face: 'shout' })) },
 };
 
+bossArt.timberFace = { ox: 0, oy: 0, rows: mirrorArt(timberFaceHalf) };
+
 let spinFrame = axeSpin;
+let smallFrame = axeSmall;
 for (let i = 0; i < 4; i++) {
   bossArt['axe' + i] = { oy: 12, rows: spinFrame };
+  bossArt['axeSmall' + i] = { ox: 7, oy: 7, rows: smallFrame };
   spinFrame = rotateArt(spinFrame);
+  smallFrame = rotateArt(smallFrame);
 }

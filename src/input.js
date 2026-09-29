@@ -17,9 +17,11 @@ const keyBindings = {
   Enter: 'start',
   ShiftRight: 'select',
   ShiftLeft: 'select',
+  KeyQ: 'prev',
+  KeyE: 'next',
 };
 
-const buttonNames = ['left', 'right', 'up', 'down', 'jump', 'fire', 'start', 'select'];
+const buttonNames = ['left', 'right', 'up', 'down', 'jump', 'fire', 'start', 'select', 'prev', 'next'];
 const keyboardHeld = {};
 const keyboardLatch = {};
 const input = { held: {}, pressed: {}, released: {} };
@@ -43,6 +45,8 @@ function readGamepadButtons() {
     if (pressed(1) || pressed(2)) result.fire = true;
     if (pressed(9)) result.start = true;
     if (pressed(8)) result.select = true;
+    if (pressed(4)) result.prev = true;
+    if (pressed(5)) result.next = true;
   }
   return result;
 }

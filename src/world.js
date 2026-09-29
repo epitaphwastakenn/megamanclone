@@ -2,17 +2,7 @@
 
 const doors = {};
 const camera = { x: 0, y: 0 };
-
-const tileSprites = {
-  '#': 'tileBrick',
-  '=': 'tileGirder',
-  M: 'tileMetal',
-  H: 'tileLadder',
-  m: 'tileMesh',
-  '|': 'tilePillar',
-  b: 'tileBack',
-  t: 'tileBackTop',
-};
+const solidTiles = '#=MI^';
 
 // FUNCTIONS
 
@@ -33,8 +23,39 @@ function getDoor(col) {
 
 function isSolidTile(col, row) {
   const ch = tileAt(col, row);
-  if (ch === '#' || ch === '=' || ch === 'M') return true;
+  if (solidTiles.includes(ch)) return true;
   if (ch === 'D') return getDoor(col).openAmount < 64;
+  return false;
+}
+
+function isIceTile(col, row) {
+  return tileAt(col, row) === 'I';
+}
+
+function isSpikeTile(col, row) {
+  return tileAt(col, row) === '^';
+}
+
+function standingOnIce(body) {
+  const row = Math.floor((body.y + 0.5) / tileSize);
+  const colStart = Math.floor((body.x - body.w / 2) / tileSize);
+  const colEnd = Math.floor((body.x + body.w / 2 - 0.01) / tileSize);
+  let ice = false;
+  for (let col = colStart; col <= colEnd; col++) {
+    if (isIceTile(col, row)) ice = true;
+    else if (isSolidTile(col, row)) return false;
+  }
+  return ice;
+}
+
+function touchingSpikes(body) {
+  const colStart = Math.floor((body.x - body.w / 2 - 1) / tileSize);
+  const colEnd = Math.floor((body.x + body.w / 2) / tileSize);
+  const rowStart = Math.floor((body.y - body.h) / tileSize);
+  const rowEnd = Math.floor((body.y + 1) / tileSize);
+  for (let row = rowStart; row <= rowEnd; row++) {
+    for (let col = colStart; col <= colEnd; col++) if (isSpikeTile(col, row)) return true;
+  }
   return false;
 }
 
@@ -162,6 +183,7 @@ function boxBlockedAbove(x, y, w, h) {
 }
 
 function drawTiles(ctx) {
+  const theme = currentStage;
   const colStart = Math.floor(camera.x / tileSize);
   const colEnd = Math.floor((camera.x + screenWidth - 1) / tileSize);
   const rowStart = Math.floor(camera.y / tileSize);
@@ -176,9 +198,9 @@ function drawTiles(ctx) {
         drawDoorTile(ctx, col, row, screenX, screenY);
         continue;
       }
-      let name = tileSprites[ch];
-      if (ch === '#' && !isSolidTile(col, row - 1) && tileAt(col, row - 1) !== 'H') name = 'tileGrass';
-      if (name) drawSprite(ctx, name, screenX, screenY, false, 'enemy');
+      let name = theme.tiles[ch];
+      if (theme.groundTop[ch] && !isSolidTile(col, row - 1) && tileAt(col, row - 1) !== 'H') name = theme.groundTop[ch];
+      if (name) drawSprite(ctx, name, screenX, screenY, false, theme.tilePalette);
     }
   }
 }

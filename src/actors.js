@@ -20,6 +20,11 @@ const enemyTypes = {
   screw: { w: 16, h: 8, hp: 3, damage: 2 },
   blaster: { w: 14, h: 16, hp: 1, damage: 2 },
   bigEye: { w: 26, h: 36, hp: 20, damage: 10 },
+  flea: { w: 14, h: 10, hp: 1, damage: 2 },
+  pengs: { w: 2, h: 2, hp: 1, damage: 0, intangible: true },
+  peng: { w: 20, h: 12, hp: 1, damage: 2, faceLeft: true },
+  joe: { w: 18, h: 24, hp: 10, damage: 4, faceLeft: true },
+  picketMan: { w: 20, h: 22, hp: 8, damage: 4 },
 };
 
 // FUNCTIONS
@@ -60,32 +65,53 @@ function updatePlayerShots() {
   for (let i = playerShots.length - 1; i >= 0; i--) {
     const shot = playerShots[i];
     shot.age++;
-    shot.x += shot.vx;
-    shot.y += shot.vy;
-    if (!onScreen(shot.x, shot.y, 16)) {
+    if (shot.reflected) {
+      shot.x += shot.vx;
+      shot.y += shot.vy;
+      if (!onScreen(shot.x, shot.y, 16)) playerShots.splice(i, 1);
+      continue;
+    }
+    const alive = moveSpecialShot(shot);
+    if (!alive || !onScreen(shot.x, shot.y, shot.kind === 'axe' ? 64 : 16)) {
       playerShots.splice(i, 1);
       continue;
     }
-    if (shot.reflected) continue;
-    const box = centerBox(shot.x, shot.y, shot.w, shot.h);
-    let consumed = false;
-    for (const enemy of enemies) {
-      if (!enemy.alive || shot.hitList.includes(enemy)) continue;
-      if (!boxesOverlap(box, bodyBox(enemy))) continue;
-      if (enemyShielded(enemy)) {
-        reflectShot(shot);
-        break;
-      }
-      const killed = damageEnemy(enemy, shot.damage);
-      shot.hitList.push(enemy);
-      if (!(shot.kind === 'full' && killed)) {
-        consumed = true;
-        break;
-      }
-    }
-    if (!consumed && !shot.reflected && typeof hitBossWithShot === 'function') consumed = hitBossWithShot(shot, box);
-    if (consumed) playerShots.splice(i, 1);
+    if (hitWithShot(shot)) playerShots.splice(i, 1);
   }
+}
+
+function hitWithShot(shot) {
+  const box = centerBox(shot.x, shot.y, shot.w, shot.h);
+  for (const enemy of enemies) {
+    if (!enemy.alive || enemy.intangible || shot.hitList.includes(enemy)) continue;
+    if (!boxesOverlap(box, bodyBox(enemy))) continue;
+    if (enemyShielded(enemy) && shot.kind !== 'axe') {
+      if (shot.kind === 'cone') {
+        burstCone(shot);
+        return true;
+      }
+      if (shot.kind === 'needle') {
+        playSfx('tink');
+        return true;
+      }
+      reflectShot(shot);
+      return false;
+    }
+    const killed = damageEnemy(enemy, shot.damage);
+    shot.hitList.push(enemy);
+    if (shot.kind === 'axe') continue;
+    if (shot.kind === 'cone') {
+      burstCone(shot);
+      return true;
+    }
+    if (!(shot.kind === 'full' && killed)) return true;
+  }
+  const result = hitBossWithShot(shot, box);
+  if (result === 'hit') {
+    if (shot.kind === 'cone') burstCone(shot);
+    return shot.kind !== 'axe';
+  }
+  return result === 'consumed';
 }
 
 function drawPlayerShots(ctx) {
@@ -95,21 +121,24 @@ function drawPlayerShots(ctx) {
     const flip = shot.dir < 0;
     if (shot.kind === 'pellet') drawSprite(ctx, 'busterShot', sx, sy, flip, 'enemy');
     else if (shot.kind === 'mid') drawSprite(ctx, 'chargeMid' + (1 + (Math.floor(shot.age / 3) % 2)), sx, sy, flip, 'enemy');
-    else drawSprite(ctx, 'chargeFull' + (1 + (Math.floor(shot.age / 3) % 2)), sx, sy, flip, 'enemy');
+    else if (shot.kind === 'full') drawSprite(ctx, 'chargeFull' + (1 + (Math.floor(shot.age / 3) % 2)), sx, sy, flip, 'enemy');
+    else drawSpecialShot(ctx, shot, sx, sy);
   }
 }
 
-function fireEnemyShot(x, y, vx, vy, damage, sprite) {
-  enemyShots.push({ x, y, vx, vy, damage: damage || 2, w: 6, h: 6, sprite: sprite || 'enemyShot' });
+function fireEnemyShot(x, y, vx, vy, damage, sprite, extra) {
+  enemyShots.push({ x, y, vx, vy, damage: damage || 2, w: 6, h: 6, sprite: sprite || 'enemyShot', age: 0, gravity: 0, ...(extra || {}) });
 }
 
 function updateEnemyShots() {
   const hitBox = playerHitBox();
   for (let i = enemyShots.length - 1; i >= 0; i--) {
     const shot = enemyShots[i];
+    shot.age++;
+    shot.vy += shot.gravity;
     shot.x += shot.vx;
     shot.y += shot.vy;
-    if (!onScreen(shot.x, shot.y, 8)) {
+    if (!onScreen(shot.x, shot.y, shot.gravity ? 48 : 8)) {
       enemyShots.splice(i, 1);
       continue;
     }
@@ -121,7 +150,10 @@ function updateEnemyShots() {
 }
 
 function drawEnemyShots(ctx) {
-  for (const shot of enemyShots) drawSprite(ctx, shot.sprite, shot.x - camera.x, shot.y - camera.y, false, 'enemy');
+  for (const shot of enemyShots) {
+    const name = shot.frames ? shot.frames[Math.floor(shot.age / shot.frameRate) % shot.frames.length] : shot.sprite;
+    drawSprite(ctx, name, shot.x - camera.x, shot.y - camera.y, shot.vx < 0 && !!shot.frames, 'enemy');
+  }
 }
 
 function createEnemy(spawn) {
@@ -144,6 +176,7 @@ function createEnemy(spawn) {
     alive: true,
     spawn,
     onGround: true,
+    intangible: !!spec.intangible,
   };
   if (spawn.type === 'met') enemy.state = 'hide';
   if (spawn.type === 'blader') {
@@ -163,6 +196,22 @@ function createEnemy(spawn) {
     enemy.timer = 50;
     enemy.jumps = 0;
   }
+  if (spawn.type === 'flea') enemy.timer = 20;
+  if (spawn.type === 'pengs') enemy.timer = 20;
+  if (spawn.type === 'peng') {
+    enemy.baseY = spawn.y;
+    enemy.vx = spawn.vx;
+    enemy.facing = Math.sign(spawn.vx);
+  }
+  if (spawn.type === 'joe') {
+    enemy.state = 'guard';
+    enemy.timer = 40;
+    enemy.jumps = 0;
+  }
+  if (spawn.type === 'picketMan') {
+    enemy.state = 'guard';
+    enemy.timer = 30;
+  }
   enemies.push(enemy);
   return enemy;
 }
@@ -170,6 +219,8 @@ function createEnemy(spawn) {
 function enemyShielded(enemy) {
   if (enemy.type === 'met') return enemy.state === 'hide';
   if (enemy.type === 'blaster') return enemy.state === 'closed';
+  if (enemy.type === 'joe') return enemy.state === 'guard' || enemy.state === 'jump';
+  if (enemy.type === 'picketMan') return enemy.state === 'guard';
   return false;
 }
 
@@ -186,14 +237,16 @@ function damageEnemy(enemy, damage) {
 
 function destroyEnemy(enemy) {
   enemy.alive = false;
-  enemy.spawn.state = 'dead';
+  if (enemy.spawn.state) enemy.spawn.state = 'dead';
   spawnEffect('explode', enemy.x, enemy.y - enemy.h / 2);
   playSfx('explode');
   const roll = Math.random();
   let drop = null;
   if (roll < 0.03) drop = 'oneUp';
-  else if (roll < 0.1) drop = 'energyBig';
+  else if (roll < 0.09) drop = 'energyBig';
+  else if (roll < 0.14) drop = 'weaponBig';
   else if (roll < 0.32) drop = 'energySmall';
+  else if (roll < 0.42) drop = 'weaponSmall';
   if (drop) spawnItem(drop, enemy.x, enemy.y - enemy.h / 2, true);
 }
 
@@ -329,6 +382,108 @@ function updateBigEye(enemy) {
   }
 }
 
+function updateFlea(enemy) {
+  enemy.justLanded = false;
+  if (enemy.onGround) {
+    enemy.vx = 0;
+    enemy.timer--;
+    if (enemy.timer <= 0) {
+      aimAtPlayer(enemy);
+      const high = Math.random() < 0.35;
+      enemy.vy = high ? -5.2 : -3.6;
+      enemy.vx = enemy.facing * (high ? 1.2 : 1.8);
+      enemy.onGround = false;
+    }
+  }
+  const result = applyEnemyGravity(enemy);
+  if (result.hitWall) enemy.vx = 0;
+  if (enemy.justLanded) enemy.timer = 16 + Math.floor(Math.random() * 24);
+}
+
+function updatePengSpawner(enemy) {
+  enemy.timer--;
+  if (enemy.timer > 0) return;
+  enemy.timer = 70 + Math.floor(Math.random() * 40);
+  const alive = enemies.filter(other => other.type === 'peng' && other.alive).length;
+  if (alive >= 3) return;
+  const y = enemy.y + Math.floor(Math.random() * 5) * 8 - 16;
+  createEnemy({ type: 'peng', x: camera.x + screenWidth + 10, y, vx: -1.4, state: null });
+}
+
+function updatePeng(enemy) {
+  enemy.anim++;
+  enemy.x += enemy.vx;
+  enemy.y = enemy.baseY + Math.sin(enemy.anim / 10) * 14;
+}
+
+function updateJoe(enemy) {
+  enemy.justLanded = false;
+  aimAtPlayer(enemy);
+  enemy.timer--;
+  if (enemy.state === 'guard') {
+    if (enemy.timer <= 0) {
+      enemy.state = 'lower';
+      enemy.timer = 8;
+    }
+  } else if (enemy.state === 'lower') {
+    if (enemy.timer <= 0) {
+      enemy.state = 'shoot';
+      enemy.timer = 48;
+    }
+  } else if (enemy.state === 'shoot') {
+    if (enemy.timer % 16 === 8) {
+      fireEnemyShot(enemy.x + enemy.facing * 12, enemy.y - 8, enemy.facing * 2.6, 0, 3, 'joeShot');
+      playSfx('enemyShot');
+    }
+    if (enemy.timer <= 0) {
+      enemy.jumps++;
+      if (enemy.jumps % 2 === 0 && enemy.onGround) {
+        enemy.state = 'jump';
+        enemy.vy = -5;
+        enemy.onGround = false;
+      } else {
+        enemy.state = 'guard';
+        enemy.timer = 60 + Math.floor(Math.random() * 40);
+      }
+    }
+  }
+  applyEnemyGravity(enemy);
+  if (enemy.state === 'jump' && enemy.justLanded) {
+    enemy.state = 'guard';
+    enemy.timer = 50;
+  }
+}
+
+function updatePicketMan(enemy) {
+  aimAtPlayer(enemy);
+  enemy.timer--;
+  if (enemy.state === 'guard') {
+    if (enemy.timer <= 0) {
+      enemy.state = 'windup';
+      enemy.timer = 14;
+      enemy.throwsLeft = 2 + Math.floor(Math.random() * 2);
+    }
+  } else if (enemy.state === 'windup') {
+    if (enemy.timer <= 0) {
+      const vx = Math.max(-2.6, Math.min(2.6, (player.x - enemy.x) / 49));
+      fireEnemyShot(enemy.x, enemy.y - 22, vx, -4.4, 3, 'picket0', { gravity: 0.18, frames: ['picket0', 'picket1', 'picket2', 'picket3'], frameRate: 3, w: 10, h: 10 });
+      playSfx('throw');
+      enemy.state = 'release';
+      enemy.timer = 10;
+    }
+  } else if (enemy.state === 'release' && enemy.timer <= 0) {
+    enemy.throwsLeft--;
+    if (enemy.throwsLeft > 0) {
+      enemy.state = 'windup';
+      enemy.timer = 12;
+    } else {
+      enemy.state = 'guard';
+      enemy.timer = 50 + Math.floor(Math.random() * 40);
+    }
+  }
+  applyEnemyGravity(enemy);
+}
+
 function updateEnemies(allowContact) {
   const hitBox = playerHitBox();
   for (let i = enemies.length - 1; i >= 0; i--) {
@@ -343,13 +498,18 @@ function updateEnemies(allowContact) {
     else if (enemy.type === 'screw') updateScrew(enemy);
     else if (enemy.type === 'blaster') updateBlaster(enemy);
     else if (enemy.type === 'bigEye') updateBigEye(enemy);
+    else if (enemy.type === 'flea') updateFlea(enemy);
+    else if (enemy.type === 'pengs') updatePengSpawner(enemy);
+    else if (enemy.type === 'peng') updatePeng(enemy);
+    else if (enemy.type === 'joe') updateJoe(enemy);
+    else if (enemy.type === 'picketMan') updatePicketMan(enemy);
     if (!onScreen(enemy.x, enemy.y - enemy.h / 2, 48)) {
       enemy.alive = false;
-      enemy.spawn.state = 'dead';
+      if (enemy.spawn.state) enemy.spawn.state = 'dead';
       enemies.splice(i, 1);
       continue;
     }
-    if (allowContact && !player.dead && player.visible && boxesOverlap(bodyBox(enemy), hitBox)) hurtPlayer(enemy.damage);
+    if (allowContact && !enemy.intangible && !player.dead && player.visible && boxesOverlap(bodyBox(enemy), hitBox)) hurtPlayer(enemy.damage);
   }
 }
 
@@ -370,6 +530,17 @@ function enemySprite(enemy) {
     case 'bigEye':
       if (!enemy.onGround) return enemy.vy < 0 ? 'bigEye2' : 'bigEye3';
       return enemy.timer < 8 ? 'bigEye1' : 'bigEye0';
+    case 'flea':
+      return enemy.onGround ? 'flea1' : 'flea2';
+    case 'peng':
+      return Math.floor(enemy.anim / 8) % 2 ? 'peng2' : 'peng1';
+    case 'joe':
+      if (enemy.state === 'jump') return 'joeJump';
+      if (enemy.state === 'shoot') return 'joeShoot';
+      return enemy.state === 'lower' ? 'joeLower' : 'joeShield';
+    case 'picketMan':
+      if (enemy.state === 'windup') return 'picketMan1';
+      return enemy.state === 'release' ? 'picketMan2' : 'picketMan0';
   }
   return null;
 }
@@ -377,11 +548,13 @@ function enemySprite(enemy) {
 function drawEnemies(ctx) {
   for (const enemy of enemies) {
     const name = enemySprite(enemy);
+    if (!name) continue;
     const palette = enemy.flash > 0 && enemy.flash % 2 === 0 ? 'enemyFlash' : 'enemy';
     let drawY = enemy.y - camera.y;
     if (enemy.type === 'blaster') drawY -= 8;
     if (enemy.type === 'blader') drawY += 4;
-    const flip = enemy.facing < 0;
+    if (enemy.type === 'peng') drawY -= 6;
+    const flip = enemyTypes[enemy.type].faceLeft ? enemy.facing > 0 : enemy.facing < 0;
     if (enemy.type === 'blaster') {
       const drawX = enemy.facing > 0 ? enemy.x - 7 : enemy.x + 7;
       drawSprite(ctx, name, drawX - camera.x, drawY, flip, palette);
@@ -414,7 +587,12 @@ function updateSpawns(room) {
 }
 
 function spawnItem(type, x, y, temporary, levelId) {
-  const size = type === 'energySmall' ? { w: 8, h: 8 } : { w: 14, h: 14 };
+  if (type.startsWith('weapon') && !hasSpecialWeapons()) {
+    if (temporary) return;
+    type = type === 'weaponBig' ? 'energyBig' : 'energySmall';
+  }
+  const small = type === 'energySmall' || type === 'weaponSmall';
+  const size = small ? { w: 8, h: 8 } : { w: 14, h: 12 };
   items.push({ type, x, y, vy: temporary ? -2 : 0, w: size.w, h: size.h, timer: temporary ? 360 : -1, levelId, anim: 0, onGround: false });
 }
 
@@ -460,18 +638,25 @@ function collectItem(item) {
     playSfx('oneUp');
     return;
   }
-  const amount = item.type === 'energyBig' ? 10 : 2;
-  if (player.health < playerStats.maxHealth) stage.fillQueue += amount;
+  const amount = item.type.endsWith('Big') ? 10 : 2;
+  if (item.type.startsWith('energy')) queueFill('health', amount);
+  else {
+    const target = weaponRefillTarget();
+    if (target) queueFill(target, amount);
+  }
 }
 
 function drawItems(ctx) {
   for (const item of items) {
     if (!onScreen(item.x, item.y, 16)) continue;
     if (item.timer > 0 && item.timer < 90 && Math.floor(item.timer / 2) % 2 === 0) continue;
+    const frame = Math.floor(item.anim / 8) % 2 ? 1 : 2;
     let name = 'oneUp';
-    if (item.type === 'energySmall') name = Math.floor(item.anim / 8) % 2 ? 'energySmall1' : 'energySmall2';
-    if (item.type === 'energyBig') name = Math.floor(item.anim / 8) % 2 ? 'energyBig1' : 'energyBig2';
-    drawSprite(ctx, name, item.x - camera.x, item.y - camera.y, false, item.type === 'oneUp' ? 'mega' : 'enemy');
+    if (item.type === 'energySmall') name = 'energySmall' + frame;
+    if (item.type === 'energyBig') name = 'energyBig' + frame;
+    if (item.type === 'weaponSmall') name = 'weaponEnergySmall' + frame;
+    if (item.type === 'weaponBig') name = 'weaponEnergyBig' + frame;
+    drawSprite(ctx, name, item.x - camera.x, item.y - camera.y, false, item.type.startsWith('energy') ? 'enemy' : 'mega');
   }
 }
 

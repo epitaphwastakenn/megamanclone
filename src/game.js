@@ -7,6 +7,15 @@ const game = {
   fade: null,
   fadeLevel: 0,
   stars: [],
+  snow: [],
+  defeated: new Set(),
+  weaponEnergy: { timber: 28, pine: 28 },
+  cursor: { col: 0, row: 1 },
+  selectTimer: 0,
+  bossId: null,
+  weaponId: null,
+  choice: 0,
+  present: null,
 };
 
 const stage = {
@@ -14,14 +23,21 @@ const stage = {
   timer: 0,
   room: null,
   checkpointIndex: 0,
-  fillQueue: 0,
+  fills: [],
   fillTimer: 0,
   transition: null,
   doorSequence: null,
   bossPhase: null,
   bossDefeated: false,
   pauseReturn: null,
+  pauseCursor: 0,
+  snowCameraX: 0,
 };
+
+const selectSlots = [
+  { col: 0, row: 1, boss: 'timber' },
+  { col: 2, row: 1, boss: 'pine' },
+];
 
 // FUNCTIONS
 
@@ -78,8 +94,44 @@ function drawStars(ctx, top, bottom) {
   }
 }
 
+function makeSnow() {
+  game.snow = [];
+  for (let i = 0; i < 48; i++) {
+    game.snow.push({ x: Math.random() * screenWidth, y: Math.random() * screenHeight, speed: 0.35 + Math.random() * 0.8, drift: Math.random() * Math.PI * 2, size: Math.random() < 0.3 ? 2 : 1 });
+  }
+  stage.snowCameraX = camera.x;
+}
+
+function updateSnow() {
+  const scroll = (camera.x - stage.snowCameraX) * 0.5;
+  stage.snowCameraX = camera.x;
+  for (const flake of game.snow) {
+    flake.y += flake.speed;
+    flake.x += Math.sin(flake.drift + flake.y / 24) * 0.3 - scroll;
+    if (flake.y >= screenHeight) {
+      flake.y -= screenHeight;
+      flake.x = Math.random() * screenWidth;
+    }
+    if (flake.x < 0) flake.x += screenWidth;
+    if (flake.x >= screenWidth) flake.x -= screenWidth;
+  }
+}
+
+function drawSnow(ctx) {
+  for (const flake of game.snow) {
+    ctx.fillStyle = flake.size > 1 ? nesPalette[0x30] : nesPalette[0x31];
+    ctx.fillRect(Math.floor(flake.x), Math.floor(flake.y), flake.size, flake.size);
+  }
+}
+
 function currentRoomBounds() {
   return roomBounds(stage.room);
+}
+
+function enterStage(id) {
+  loadStage(id);
+  refillWeapons();
+  startStage(0);
 }
 
 function startStage(checkpointIndex) {
@@ -92,7 +144,7 @@ function startStage(checkpointIndex) {
   resetLevelItems();
   effects.length = 0;
   clearBoss();
-  stage.fillQueue = 0;
+  stage.fills = [];
   stage.transition = null;
   stage.doorSequence = null;
   stage.bossPhase = null;
@@ -104,13 +156,20 @@ function startStage(checkpointIndex) {
   const target = cameraTargetFor(stage.room, x);
   camera.x = target.x;
   camera.y = target.y;
+  if (currentStage.snow) makeSnow();
   stage.state = 'ready';
   stage.timer = 0;
-  playSong(stageSong);
+  playSong(currentStage.song);
+}
+
+function queueFill(target, amount) {
+  const full = target === 'health' ? player.health >= playerStats.maxHealth : game.weaponEnergy[target] >= weaponMaxEnergy;
+  if (!full) stage.fills.push({ target, amount });
 }
 
 function updateStage() {
   stageEvents.playerFired = false;
+  if (currentStage.snow) updateSnow();
   switch (stage.state) {
     case 'ready':
       updateReady();
@@ -137,10 +196,7 @@ function updateStage() {
       updateVictory();
       break;
     case 'paused':
-      if (input.pressed.start) {
-        stage.state = stage.pauseReturn || 'play';
-        playSfx('pause');
-      }
+      updatePause();
       break;
   }
 }
@@ -161,12 +217,32 @@ function updateReady() {
   }
 }
 
+function openPause() {
+  stage.pauseReturn = 'play';
+  stage.state = 'paused';
+  stage.pauseCursor = Math.max(0, ownedWeapons().indexOf(player.weapon));
+  playSfx('pause');
+  stopChargeSound();
+  player.charge = 0;
+}
+
+function updatePause() {
+  const owned = ownedWeapons();
+  if (input.pressed.up || input.pressed.down) {
+    const step = input.pressed.up ? -1 : 1;
+    stage.pauseCursor = (stage.pauseCursor + step + owned.length) % owned.length;
+    playSfx('blip');
+  }
+  if (input.pressed.start) {
+    selectWeapon(owned[stage.pauseCursor]);
+    stage.state = stage.pauseReturn || 'play';
+    playSfx('pause');
+  }
+}
+
 function updatePlay() {
   if (input.pressed.start && player.control) {
-    stage.pauseReturn = 'play';
-    stage.state = 'paused';
-    playSfx('pause');
-    stopChargeSound();
+    openPause();
     return;
   }
   updatePlayer();
@@ -187,7 +263,7 @@ function updatePlay() {
     stage.timer = 0;
     return;
   }
-  if (stage.fillQueue > 0) {
+  if (stage.fills.length > 0) {
     stage.state = 'fill';
     stage.fillTimer = 0;
     stopChargeSound();
@@ -359,7 +435,7 @@ function updateBossIntro() {
   if (intro.phase === 'wait') {
     if (intro.timer >= 40) {
       const bounds = currentRoomBounds();
-      spawnBoss(bounds.left + 12 * tileSize, bounds.top + 40);
+      spawnBoss(currentStage.boss, bounds.left + 12 * tileSize, bounds.top + 40);
       intro.phase = 'drop';
       intro.timer = 0;
     }
@@ -375,11 +451,11 @@ function updateBossIntro() {
       boss.state = 'idle';
     }
   } else if (intro.phase === 'fill') {
-    if (intro.timer % 3 === 0 && boss.health < bossStats.maxHealth) {
+    if (intro.timer % 3 === 0 && boss.health < bossMaxHealth) {
       boss.health++;
       playSfx('bossFill');
     }
-    if (boss.health >= bossStats.maxHealth && intro.timer > 90) {
+    if (boss.health >= bossMaxHealth && intro.timer > 90) {
       boss.state = 'fight';
       player.control = true;
       stage.state = 'play';
@@ -392,14 +468,22 @@ function updateBossIntro() {
 function updateFill() {
   stage.fillTimer++;
   if (stage.fillTimer % 3 !== 0) return;
-  if (stage.fillQueue > 0 && player.health < playerStats.maxHealth) {
-    player.health++;
-    stage.fillQueue--;
-    playSfx('tick');
-  } else {
-    stage.fillQueue = 0;
+  const fill = stage.fills[0];
+  if (!fill) {
     stage.state = 'play';
+    return;
   }
+  const health = fill.target === 'health';
+  const full = health ? player.health >= playerStats.maxHealth : game.weaponEnergy[fill.target] >= weaponMaxEnergy;
+  if (fill.amount > 0 && !full) {
+    if (health) player.health++;
+    else game.weaponEnergy[fill.target]++;
+    fill.amount--;
+    playSfx('tick');
+    return;
+  }
+  stage.fills.shift();
+  if (!stage.fills.length) stage.state = 'play';
 }
 
 function updateDead() {
@@ -412,6 +496,7 @@ function updateDead() {
     startFade(() => {
       if (game.lives <= 0) {
         setScene('gameOver');
+        game.choice = 0;
         playSong(gameOverSong);
         return;
       }
@@ -425,6 +510,9 @@ function onBossDefeated() {
   stage.state = 'victory';
   stage.timer = 0;
   stage.bossDefeated = true;
+  game.defeated.add(currentStage.boss);
+  game.weaponId = bossDefs[currentStage.boss].weapon;
+  game.weaponEnergy[game.weaponId] = weaponMaxEnergy;
   player.control = false;
   player.shootTimer = 0;
   enemyShots.length = 0;
@@ -458,8 +546,9 @@ function updateVictory() {
 }
 
 function drawStage(ctx) {
-  ctx.fillStyle = nesPalette[0x0F];
+  ctx.fillStyle = nesPalette[currentStage.sky];
   ctx.fillRect(0, 0, screenWidth, screenHeight);
+  if (currentStage.snow) drawSnow(ctx);
   drawTiles(ctx);
   drawItems(ctx);
   drawEnemies(ctx);
@@ -476,16 +565,40 @@ function drawStage(ctx) {
 }
 
 function drawPauseMenu(ctx) {
-  drawPanel(ctx, 56, 64, 144, 104);
-  drawText(ctx, 'P', 72, 80, nesPalette[0x30]);
-  for (let i = 0; i < playerStats.maxHealth; i++) {
-    ctx.fillStyle = i < player.health ? nesPalette[0x30] : nesPalette[0x00];
-    ctx.fillRect(88 + i * 3, 80, 2, 8);
-  }
-  drawText(ctx, 'MEGA BUSTER', 72, 96, nesPalette[0x2C]);
-  drawSprite(ctx, 'oneUp', 88, 140, false, 'mega');
-  drawText(ctx, 'X ' + game.lives, 104, 128, nesPalette[0x30]);
-  drawTextCentered(ctx, 'PAUSE', 128, 152, nesPalette[0x28]);
+  const owned = ownedWeapons();
+  const height = 56 + owned.length * 22;
+  const top = Math.floor((screenHeight - height) / 2);
+  drawPanel(ctx, 40, top, 176, height);
+  owned.forEach((id, index) => {
+    const def = weaponDefs[id];
+    const y = top + 14 + index * 22;
+    const selected = index === stage.pauseCursor;
+    if (selected && Math.floor(game.timer / 8) % 2 === 0) drawText(ctx, '>', 52, y, nesPalette[0x30]);
+    drawText(ctx, def.label, 64, y, selected ? nesPalette[0x30] : nesPalette[0x10]);
+    const value = id === 'buster' ? player.health : game.weaponEnergy[id];
+    drawEnergyBarWide(ctx, 64, y + 10, value, weaponMaxEnergy, def.barColors);
+  });
+  const bottom = top + height - 34;
+  drawSprite(ctx, 'oneUp', 80, bottom + 16, false, weaponDefs[owned[stage.pauseCursor]].palette);
+  drawText(ctx, 'X ' + game.lives, 96, bottom + 5, nesPalette[0x30]);
+  drawText(ctx, 'PAUSE', 144, bottom + 5, nesPalette[0x28]);
+}
+
+function newGame() {
+  game.lives = 3;
+  game.defeated.clear();
+  refillWeapons();
+  game.cursor = { col: 0, row: 1 };
+}
+
+function openStageSelect() {
+  setScene('stageSelect');
+  game.selectTimer = 0;
+  const current = slotAt(game.cursor.col, game.cursor.row);
+  const next = selectSlots.find(slot => !game.defeated.has(slot.boss));
+  if (current && game.defeated.has(current.boss) && next) game.cursor = { col: next.col, row: next.row };
+  makeStars();
+  playSong(stageSelectSong);
 }
 
 function updateTitle() {
@@ -496,9 +609,8 @@ function updateTitle() {
     playSfx('menu');
     startFade(() => {
       stopSong();
-      setScene('bossPresent');
-      makeStars();
-      playSong(bossIntroSong);
+      newGame();
+      openStageSelect();
     });
   }
 }
@@ -517,18 +629,98 @@ function drawTitle(ctx) {
   drawTextCentered(ctx, 'NES REMAKE', screenWidth / 2, 68, nesPalette[0x30]);
   const pose = Math.floor(game.timer / 6) % 40 === 0 ? 'megaBlink' : 'megaStand';
   drawSpriteScaled(ctx, pose, screenWidth / 2, 140, false, 'mega', 2);
-  if (Math.floor(game.timer / 20) % 2 === 0) drawTextCentered(ctx, 'PRESS START', screenWidth / 2, 152, nesPalette[0x30]);
-  drawText(ctx, 'SETAS   MOVER', 48, 170, nesPalette[0x10]);
-  drawText(ctx, 'X       PULAR', 48, 180, nesPalette[0x10]);
-  drawText(ctx, 'Z       ATIRAR', 48, 190, nesPalette[0x10]);
-  drawText(ctx, 'SEGURE Z CARREGAR', 48, 200, nesPalette[0x10]);
-  drawText(ctx, 'BAIXO+X DESLIZAR', 48, 210, nesPalette[0x10]);
-  drawTextCentered(ctx, 'ENTER PAUSA   M SOM', screenWidth / 2, 222, nesPalette[0x00]);
+  if (Math.floor(game.timer / 20) % 2 === 0) drawTextCentered(ctx, 'PRESS START', screenWidth / 2, 150, nesPalette[0x30]);
+  drawText(ctx, 'SETAS   MOVER', 48, 164, nesPalette[0x10]);
+  drawText(ctx, 'X       PULAR', 48, 174, nesPalette[0x10]);
+  drawText(ctx, 'Z       ATIRAR', 48, 184, nesPalette[0x10]);
+  drawText(ctx, 'SEGURE Z CARREGAR', 48, 194, nesPalette[0x10]);
+  drawText(ctx, 'BAIXO+X DESLIZAR', 48, 204, nesPalette[0x10]);
+  drawText(ctx, 'SHIFT   TROCAR ARMA', 48, 214, nesPalette[0x10]);
+  drawTextCentered(ctx, 'ENTER PAUSA   M SOM', screenWidth / 2, 226, nesPalette[0x00]);
+}
+
+function slotAt(col, row) {
+  return selectSlots.find(slot => slot.col === col && slot.row === row) || null;
+}
+
+function moveSelectCursor(dx, dy) {
+  const cursor = game.cursor;
+  cursor.col = (cursor.col + dx + 3) % 3;
+  cursor.row = (cursor.row + dy + 3) % 3;
+  if (cursor.col === 1 && cursor.row === 1) {
+    cursor.col = (cursor.col + dx + 3) % 3;
+    cursor.row = (cursor.row + dy + 3) % 3;
+  }
+  playSfx('blip');
+}
+
+function updateStageSelect() {
+  game.timer++;
+  if (game.selectTimer > 0) {
+    game.selectTimer++;
+    if (game.selectTimer === 50) {
+      startFade(() => {
+        stopSong();
+        setScene('bossPresent');
+        makeStars();
+        playSong(bossIntroSong);
+      });
+    }
+    return;
+  }
+  if (input.pressed.left) moveSelectCursor(-1, 0);
+  else if (input.pressed.right) moveSelectCursor(1, 0);
+  else if (input.pressed.up) moveSelectCursor(0, -1);
+  else if (input.pressed.down) moveSelectCursor(0, 1);
+  if (input.pressed.start || input.pressed.jump || input.pressed.fire) {
+    const slot = slotAt(game.cursor.col, game.cursor.row);
+    if (!slot || game.defeated.has(slot.boss)) {
+      playSfx('error');
+      return;
+    }
+    game.bossId = slot.boss;
+    game.selectTimer = 1;
+    playSfx('select');
+  }
+}
+
+function drawStageSelect(ctx) {
+  ctx.fillStyle = nesPalette[0x0F];
+  ctx.fillRect(0, 0, screenWidth, screenHeight);
+  drawStars(ctx, 0, screenHeight);
+  drawTextCentered(ctx, 'STAGE SELECT', screenWidth / 2, 8, nesPalette[0x2C]);
+  const cursor = game.cursor;
+  const flashRate = game.selectTimer > 0 ? 3 : 8;
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 3; col++) {
+      const x = 24 + col * 80;
+      const y = 24 + row * 64;
+      const selected = cursor.col === col && cursor.row === row;
+      ctx.fillStyle = nesPalette[0x0F];
+      ctx.fillRect(x + 4, y + 4, 40, 40);
+      drawSprite(ctx, selected && Math.floor(game.timer / flashRate) % 2 === 0 ? 'selectPanel1' : 'selectPanel0', x, y, false, 'mega');
+      if (col === 1 && row === 1) {
+        const face = (cursor.row * 3) + cursor.col;
+        drawSprite(ctx, 'megaSelect' + face, x + 8, y + 8, false, 'mega');
+        continue;
+      }
+      const slot = slotAt(col, row);
+      if (!slot) {
+        drawTextCentered(ctx, '?', x + 24, y + 20, nesPalette[0x2D]);
+        continue;
+      }
+      const def = bossDefs[slot.boss];
+      if (!game.defeated.has(slot.boss)) drawSprite(ctx, def.portrait, x + 8, y + 8, false, 'boss');
+      drawTextCentered(ctx, def.name, x + 24, y + 52, game.defeated.has(slot.boss) ? nesPalette[0x2D] : nesPalette[0x30]);
+    }
+  }
+  if (game.selectTimer === 0 && Math.floor(game.timer / 20) % 2 === 0) drawTextCentered(ctx, 'PUSH START', screenWidth / 2, 222, nesPalette[0x30]);
 }
 
 function updateBossPresent() {
   game.timer++;
   updateStars(1);
+  const def = bossDefs[game.bossId];
   const present = game.present || (game.present = { y: -20, vy: 0, landed: false, landTime: 0 });
   if (game.timer === 1) Object.assign(present, { y: -20, vy: 0, landed: false, landTime: 0 });
   if (!present.landed) {
@@ -540,13 +732,11 @@ function updateBossPresent() {
       present.landTime = game.timer;
     }
   }
-  const typed = present.landed ? Math.floor((game.timer - present.landTime - 30) / 6) : -1;
-  if (typed >= 0 && typed < 10 && (game.timer - present.landTime - 30) % 6 === 0 && 'TIMBER MAN'[typed] !== ' ') playSfx('blip');
+  const step = game.timer - present.landTime - 30;
+  const typed = present.landed ? Math.floor(step / 6) : -1;
+  if (typed >= 0 && typed < def.name.length && step % 6 === 0 && def.name[typed] !== ' ') playSfx('blip');
   if (game.timer === 330 || (game.timer > 60 && input.pressed.start)) {
-    startFade(() => {
-      game.lives = 3;
-      startStage(0);
-    });
+    startFade(() => enterStage(def.stage));
   }
 }
 
@@ -561,21 +751,61 @@ function drawBossPresent(ctx) {
   drawStars(ctx, 92, 148);
   const present = game.present;
   if (!present) return;
-  let pose = 'timberJump';
+  const def = bossDefs[game.bossId];
+  let pose = def.present.fall;
   if (present.landed) {
     const since = game.timer - present.landTime;
-    pose = since < 16 ? 'timberStand' : since < 40 ? 'timberPose' : Math.floor(since / 12) % 3 === 1 ? 'timberStand' : 'timberPose';
+    pose = since < 16 ? def.present.land : since < 40 ? def.present.pose : Math.floor(since / 12) % 3 === 1 ? def.present.land : def.present.pose;
   }
   drawSprite(ctx, pose, screenWidth / 2, present.y, false, 'boss');
   if (present.landed) {
-    const count = Math.max(0, Math.min(10, Math.floor((game.timer - present.landTime - 30) / 6) + 1));
-    drawText(ctx, 'TIMBER MAN'.slice(0, count), screenWidth / 2 - 40, 172, nesPalette[0x30]);
+    const count = Math.max(0, Math.min(def.name.length, Math.floor((game.timer - present.landTime - 30) / 6) + 1));
+    drawText(ctx, def.name.slice(0, count), screenWidth / 2 - def.name.length * 4, 172, nesPalette[0x30]);
   }
 }
 
 function updateWeaponGet() {
   game.timer++;
   updateStars(-1);
+  if (game.timer > 240 && (input.pressed.start || input.pressed.jump)) {
+    startFade(() => {
+      stopSong();
+      if (selectSlots.every(slot => game.defeated.has(slot.boss))) {
+        setScene('ending');
+        makeStars();
+        playSong(titleSong);
+      } else {
+        openStageSelect();
+      }
+    });
+  }
+}
+
+function drawWeaponGet(ctx) {
+  ctx.fillStyle = nesPalette[0x0F];
+  ctx.fillRect(0, 0, screenWidth, screenHeight);
+  drawStars(ctx, 0, screenHeight);
+  const def = weaponDefs[game.weaponId];
+  const flashing = game.timer < 150;
+  const palette = flashing ? (Math.floor(game.timer / 6) % 2 ? def.palette : 'mega') : def.palette;
+  drawSprite(ctx, 'megaWeaponGet', 64, 172, false, palette);
+  const lineOne = 'YOU GOT';
+  const lineTwo = def.label;
+  const typedOne = Math.max(0, Math.min(lineOne.length, Math.floor((game.timer - 40) / 5)));
+  const typedTwo = Math.max(0, Math.min(lineTwo.length, Math.floor((game.timer - 90) / 5)));
+  drawText(ctx, lineOne.slice(0, typedOne), 120, 92, nesPalette[0x30]);
+  drawText(ctx, lineTwo.slice(0, typedTwo), 120, 108, nesPalette[0x30]);
+  if (game.timer > 170) {
+    const frame = Math.floor(game.timer / 4) % 4;
+    drawSpriteScaled(ctx, (game.weaponId === 'timber' ? 'axeSmall' : 'cone') + frame, 164, 146, false, 'boss', 2);
+  }
+  if (game.timer > 240 && Math.floor(game.timer / 20) % 2 === 0) drawTextCentered(ctx, 'PRESS START', screenWidth / 2, 200, nesPalette[0x30]);
+  if (game.timer > 20 && game.timer < 150 && game.timer % 5 === 0) playSfx('blip');
+}
+
+function updateEnding() {
+  game.timer++;
+  updateStars(1);
   if (game.timer > 240 && (input.pressed.start || input.pressed.jump)) {
     startFade(() => {
       stopSong();
@@ -586,31 +816,40 @@ function updateWeaponGet() {
   }
 }
 
-function drawWeaponGet(ctx) {
+function drawEnding(ctx) {
   ctx.fillStyle = nesPalette[0x0F];
   ctx.fillRect(0, 0, screenWidth, screenHeight);
   drawStars(ctx, 0, screenHeight);
-  const flashing = game.timer < 150;
-  const palette = flashing ? (Math.floor(game.timer / 6) % 2 ? 'megaTimber' : 'mega') : 'megaTimber';
-  drawSprite(ctx, 'megaWeaponGet', 64, 172, false, palette);
-  const lineOne = 'YOU GOT';
-  const lineTwo = 'TIMBER AXE';
-  const typedOne = Math.max(0, Math.min(lineOne.length, Math.floor((game.timer - 40) / 5)));
-  const typedTwo = Math.max(0, Math.min(lineTwo.length, Math.floor((game.timer - 90) / 5)));
-  drawText(ctx, lineOne.slice(0, typedOne), 120, 92, nesPalette[0x30]);
-  drawText(ctx, lineTwo.slice(0, typedTwo), 120, 108, nesPalette[0x30]);
-  if (game.timer > 170) drawSprite(ctx, 'axe' + (Math.floor(game.timer / 4) % 4), 176, 140, false, 'boss');
+  drawTextCentered(ctx, 'CONGRATULATIONS!', screenWidth / 2, 24, nesPalette[0x28]);
+  selectSlots.forEach((slot, index) => {
+    const x = 40 + index * 128;
+    ctx.fillStyle = nesPalette[0x0F];
+    ctx.fillRect(x + 4, 44, 40, 40);
+    drawSprite(ctx, 'selectPanel0', x, 40, false, 'mega');
+    drawSprite(ctx, bossDefs[slot.boss].portrait, x + 8, 48, false, 'boss');
+    drawTextCentered(ctx, bossDefs[slot.boss].name, x + 24, 92, nesPalette[0x30]);
+  });
+  const pose = Math.floor(game.timer / 6) % 40 === 0 ? 'megaBlink' : 'megaStand';
+  drawSpriteScaled(ctx, pose, screenWidth / 2, 104, false, 'mega', 2);
+  if (game.timer > 60) drawTextCentered(ctx, 'THE ROBOT MASTERS', screenWidth / 2, 124, nesPalette[0x30]);
+  if (game.timer > 90) drawTextCentered(ctx, 'HAVE BEEN DEFEATED!', screenWidth / 2, 136, nesPalette[0x30]);
+  if (game.timer > 150) drawTextCentered(ctx, 'THANK YOU FOR PLAYING', screenWidth / 2, 168, nesPalette[0x2C]);
   if (game.timer > 240 && Math.floor(game.timer / 20) % 2 === 0) drawTextCentered(ctx, 'PRESS START', screenWidth / 2, 200, nesPalette[0x30]);
-  if (game.timer > 20 && game.timer < 130 && game.timer % 5 === 0) playSfx('blip');
 }
 
 function updateGameOver() {
   game.timer++;
+  if (input.pressed.up || input.pressed.down) {
+    game.choice = 1 - game.choice;
+    playSfx('blip');
+  }
   if (game.timer > 60 && (input.pressed.start || input.pressed.jump)) {
+    playSfx('menu');
     startFade(() => {
       stopSong();
       game.lives = 3;
-      startStage(stage.checkpointIndex);
+      if (game.choice === 0) startStage(stage.checkpointIndex);
+      else openStageSelect();
     });
   }
 }
@@ -618,9 +857,13 @@ function updateGameOver() {
 function drawGameOver(ctx) {
   ctx.fillStyle = nesPalette[0x0F];
   ctx.fillRect(0, 0, screenWidth, screenHeight);
-  drawTextCentered(ctx, 'GAME OVER', screenWidth / 2, 96, nesPalette[0x30]);
-  if (game.timer > 60 && Math.floor(game.timer / 20) % 2 === 0) drawTextCentered(ctx, 'PRESS START', screenWidth / 2, 136, nesPalette[0x2C]);
-  drawTextCentered(ctx, 'CONTINUE', screenWidth / 2, 120, nesPalette[0x10]);
+  drawTextCentered(ctx, 'GAME OVER', screenWidth / 2, 88, nesPalette[0x30]);
+  const options = ['CONTINUE', 'STAGE SELECT'];
+  options.forEach((label, index) => {
+    const y = 120 + index * 16;
+    drawText(ctx, label, 88, y, index === game.choice ? nesPalette[0x30] : nesPalette[0x10]);
+    if (index === game.choice && game.timer > 60 && Math.floor(game.timer / 10) % 2 === 0) drawText(ctx, '>', 72, y, nesPalette[0x2C]);
+  });
 }
 
 function updateGame() {
@@ -632,14 +875,21 @@ function updateGame() {
     case 'title':
       updateTitle();
       break;
+    case 'stageSelect':
+      updateStageSelect();
+      break;
     case 'bossPresent':
       updateBossPresent();
       break;
     case 'stage':
+      game.timer++;
       updateStage();
       break;
     case 'weaponGet':
       updateWeaponGet();
+      break;
+    case 'ending':
+      updateEnding();
       break;
     case 'gameOver':
       updateGameOver();
@@ -653,6 +903,9 @@ function drawGame(ctx) {
     case 'title':
       drawTitle(ctx);
       break;
+    case 'stageSelect':
+      drawStageSelect(ctx);
+      break;
     case 'bossPresent':
       drawBossPresent(ctx);
       break;
@@ -661,6 +914,9 @@ function drawGame(ctx) {
       break;
     case 'weaponGet':
       drawWeaponGet(ctx);
+      break;
+    case 'ending':
+      drawEnding(ctx);
       break;
     case 'gameOver':
       drawGameOver(ctx);

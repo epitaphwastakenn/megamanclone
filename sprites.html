@@ -37,6 +37,7 @@
 <script src="src/sprites.js"></script>
 <script src="src/art/originals.js"></script>
 <script src="src/art/timberman.js"></script>
+<script src="src/art/pineman.js"></script>
 <script src="src/art/tiles.js"></script>
 <script src="src/art/font.js"></script>
 <script>
@@ -60,10 +61,23 @@ const animations = [
   { label: 'Teleporte', fps: 10, frames: ['megaBeam', 'megaBeam', 'megaBeam', 'megaTeleportB', 'megaTeleportA', 'megaStand', 'megaStand', 'megaStand'] },
   { label: 'Carga media', fps: 8, frames: [{ sprite: 'megaStand', palette: 'mega' }, { sprite: 'megaStand', palette: 'megaCharge1' }] },
   { label: 'Carga total', fps: 20, frames: [{ sprite: 'megaStand', palette: 'megaCharge2' }, { sprite: 'megaStand', palette: 'megaCharge3' }, { sprite: 'megaStand', palette: 'mega' }] },
-  { label: 'Arma Timber Axe', fps: 6, frames: [{ sprite: 'megaShoot', palette: 'mega' }, { sprite: 'megaShoot', palette: 'megaTimber' }] },
-  { label: 'Timber Man correndo', fps: 6, frames: ['timberRun1', 'timberRun2'].map(sprite => ({ sprite, palette: 'boss' })) },
-  { label: 'Timber Man', fps: 4, frames: ['timberStand', 'timberStand', 'timberBlink', 'timberStand', 'timberPose', 'timberThrow', 'timberStandX', 'timberJumpX', 'timberJump'].map(sprite => ({ sprite, palette: 'boss' })) },
-  { label: 'Timber Axe', fps: 30, frames: ['axe0', 'axe1', 'axe2', 'axe3'].map(sprite => ({ sprite, palette: 'boss' })) },
+  { label: 'Arremesso', fps: 8, frames: ['megaThrow', 'megaRunThrow1', 'megaRunThrow2', 'megaRunThrow3', 'megaRunThrow4', 'megaJumpThrow', 'megaClimbThrow'] },
+  { label: 'Arma Timber Axe', fps: 6, frames: [{ sprite: 'megaThrow', palette: 'mega' }, { sprite: 'megaThrow', palette: 'megaTimber' }] },
+  { label: 'Arma Pine Burst', fps: 6, frames: [{ sprite: 'megaThrow', palette: 'mega' }, { sprite: 'megaThrow', palette: 'megaPine' }] },
+  { label: 'Timber Man correndo', fps: 6, frames: ['timberRun1', 'timberRun2'] },
+  { label: 'Timber Man', fps: 4, frames: ['timberStand', 'timberStand', 'timberBlink', 'timberStand', 'timberPose', 'timberThrow', 'timberStandX', 'timberJumpX', 'timberJump'] },
+  { label: 'Timber Axe', fps: 30, frames: ['axe0', 'axe1', 'axe2', 'axe3'] },
+  { label: 'Timber Axe (Mega Man)', fps: 30, frames: ['axeSmall0', 'axeSmall1', 'axeSmall2', 'axeSmall3'] },
+  { label: 'Pine Man', fps: 4, frames: ['pineStand', 'pineStand', 'pineBlink', 'pineStand', 'pinePose', 'pineThrow', 'pineStandX', 'pineJump', 'pineSkate'] },
+  { label: 'Pinha', fps: 15, frames: ['cone0', 'cone1', 'cone2', 'cone3'] },
+  { label: 'Agulhas', fps: 4, frames: ['needleRight', 'needleDownRight', 'needleDown', { sprite: 'needleDownRight', flip: true }, { sprite: 'needleRight', flip: true }, { sprite: 'needleUpRight', flip: true }, 'needleUp', 'needleUpRight'] },
+  { label: 'Stage select', fps: 3, frames: ['megaSelect0', 'megaSelect1', 'megaSelect2', 'megaSelect5', 'megaSelect8', 'megaSelect7', 'megaSelect6', 'megaSelect3', 'megaSelect4'] },
+  { label: 'Retratos', fps: 1, frames: ['timberFace', 'pineFace'] },
+  { label: 'Peng', fps: 8, frames: ['peng1', 'peng2'] },
+  { label: 'Kamadoma', fps: 3, frames: ['flea1', 'flea2'] },
+  { label: 'Sniper Joe', fps: 3, frames: ['joeShield', 'joeShield', 'joeLower', 'joeShoot', 'joeShoot', 'joeLower', 'joeJump'] },
+  { label: 'Picket Man', fps: 4, frames: ['picketMan0', 'picketMan0', 'picketMan1', 'picketMan2'] },
+  { label: 'Picareta', fps: 12, frames: ['picket0', 'picket1', 'picket2', 'picket3'] },
   { label: 'Met', fps: 2, frames: ['metHide', 'metHide', 'metOpen', 'metOpen'] },
   { label: 'Blader', fps: 15, frames: ['blader1', 'blader2'] },
   { label: 'Screw Bomber', fps: 10, frames: ['screw0', 'screw0', 'screw1', 'screw2', 'screw3', 'screw4', 'screw2', 'screw3', 'screw4', 'screw1'] },
@@ -75,13 +89,14 @@ const animations = [
   { label: 'Orbes do chefe', fps: 16, frames: ['orbSmall', 'orbBig1', 'orbBig2', 'orbBig1'].map(sprite => ({ sprite, palette: 'orbBoss' })) },
   { label: 'Suor / poeira', fps: 8, frames: ['megaSweat1', 'megaSweat2', 'megaSweat3', 'dust1', 'dust2', 'dust3'] },
   { label: 'Energia', fps: 6, frames: ['energySmall1', 'energySmall2', 'energyBig1', 'energyBig2', 'energyBig1', 'energyBig2'] },
+  { label: 'Energia de arma', fps: 6, frames: ['weaponEnergySmall1', 'weaponEnergySmall2', 'weaponEnergyBig1', 'weaponEnergyBig2', 'weaponEnergyBig1', 'weaponEnergyBig2'] },
 ];
 
 // FUNCTIONS
 
 function spritePaletteFor(name) {
-  if (name.startsWith('mega') || name === 'oneUp') return 'mega';
-  if (name.startsWith('timber') || name.startsWith('axe')) return 'boss';
+  if (/^(mega|select|weaponEnergy|oneUp)/.test(name)) return 'mega';
+  if (/^(timber|axe|pine|cone|needle)/.test(name)) return 'boss';
   return 'enemy';
 }
 
@@ -160,7 +175,7 @@ function drawAnimations() {
     ctx.setTransform(entry.zoom, 0, 0, entry.zoom, 0, 0);
     ctx.clearRect(0, 0, entry.width, entry.height);
     const def = spriteDefs[frame.sprite];
-    const anchorX = Math.floor(entry.width / 2);
+    const anchorX = def.ox === 0 ? Math.floor((entry.width - def.width) / 2) : Math.floor(entry.width / 2);
     const drawY = def.oy === def.height ? entry.height - 2 : Math.floor((entry.height - def.height) / 2) + def.oy;
     drawSprite(ctx, frame.sprite, anchorX, drawY, frame.flip, frame.palette);
     if (frame.overlay) drawSprite(ctx, frame.overlay, anchorX, drawY - 10, false, 'enemy');
@@ -175,7 +190,7 @@ function renderAll() {
 
 // INITIALIZATION
 
-for (const group of [megaArtOriginals, effectArtOriginals, itemArtOriginals, enemyArtOriginals, tileArt, tileArtOriginals, bossArt]) defineSprites(group);
+for (const group of [megaArtOriginals, selectArtOriginals, effectArtOriginals, itemArtOriginals, enemyArtOriginals, tileArt, tileArtOriginals, bossArt, pineArt]) defineSprites(group);
 zoomInput.addEventListener('input', renderAll);
 lightInput.addEventListener('change', renderAll);
 renderAll();

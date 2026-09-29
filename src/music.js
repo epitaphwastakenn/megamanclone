@@ -60,13 +60,16 @@ const chordTones = {
   D: ['D4', 'F#4', 'A4', 'D5'],
   B: ['B3', 'D#4', 'F#4', 'B4'],
   Dm: ['D4', 'F4', 'A4', 'D5'],
+  Bb: ['Bb4', 'D5', 'F5', 'Bb5'],
+  A: ['A4', 'C#5', 'E5', 'A5'],
+  Gm: ['G4', 'Bb4', 'D5', 'G5'],
 };
 
-const chordRoots = { Am: 'A', F: 'F', G: 'G', E: 'E', Em: 'E', C: 'C', D: 'D', B: 'B', Dm: 'D' };
+const chordRoots = { Am: 'A', F: 'F', G: 'G', E: 'E', Em: 'E', C: 'C', D: 'D', B: 'B', Dm: 'D', Bb: 'Bb', A: 'A', Gm: 'G' };
 
 const stageChords = ['Am', 'F', 'G', 'E', 'Am', 'F', 'G', 'Am', 'F', 'G', 'Em', 'Am', 'F', 'G', 'E', 'E'];
 
-const stageSong = {
+const timberStageSong = {
   bpm: 150,
   loop: true,
   tracks: [
@@ -108,6 +111,93 @@ const stageSong = {
       wave: 'noise',
       volume: 0.12,
       notes: drumTrack(16, bar => (bar % 4 === 3 ? 'k h s h k h s h k k s h s s s s' : 'k h s h k h s h k h s h k h s o')),
+    },
+  ],
+};
+
+const pineChords = ['Dm', 'Bb', 'C', 'A', 'Dm', 'Bb', 'Gm', 'A', 'F', 'C', 'Bb', 'F', 'Dm', 'Gm', 'Bb', 'A'];
+
+const pineStageSong = {
+  bpm: 160,
+  loop: true,
+  tracks: [
+    {
+      wave: 0.25,
+      volume: 0.085,
+      decay: 0.3,
+      vibrato: true,
+      notes: parseMelody(`
+        D5:2 F5:2 A5:4 G5:2 F5:2 E5:2 F5:2
+        D5:4 Bb4:2 D5:2 F5:6 .:2
+        E5:2 G5:2 C6:4 Bb5:2 A5:2 G5:2 E5:2
+        A5:8 C#5:4 E5:4
+        D5:2 F5:2 A5:4 D6:4 C6:2 A5:2
+        Bb5:6 A5:2 F5:4 D5:4
+        G5:2 A5:2 Bb5:4 A5:2 G5:2 F5:2 E5:2
+        E5:4 F5:2 E5:2 C#5:8
+        A5:4 C6:4 A5:2 F5:2 C5:4
+        G5:4 E5:2 G5:2 C6:8
+        F5:2 G5:2 A5:2 Bb5:2 A5:4 G5:4
+        A5:8 F5:4 C5:4
+        D6:4 C6:2 A5:2 F5:4 D5:4
+        G5:2 Bb5:2 D6:4 C6:2 Bb5:2 A5:4
+        Bb5:4 A5:2 G5:2 F5:2 E5:2 D5:2 E5:2
+        A5:8 .:4 A4:2 C#5:2
+      `),
+    },
+    {
+      wave: 0.125,
+      volume: 0.045,
+      notes: arpeggioTrack(pineChords, 16, [0, 2, 1, 3, 2, 1, 0, 2]),
+    },
+    {
+      wave: 'tri',
+      volume: 0.2,
+      notes: bassTrack(pineChords, 16, 'drive'),
+    },
+    {
+      wave: 'noise',
+      volume: 0.11,
+      notes: drumTrack(16, bar => (bar % 8 === 7 ? 'k h s h k k s h k h s s s s s s' : bar % 2 === 1 ? 'k h s h k h s h k k s h k h s o' : 'k h s h k h s h k h s h k h s h')),
+    },
+  ],
+};
+
+const selectChords = ['C', 'Am', 'F', 'G', 'C', 'Am', 'F', 'G'];
+
+const stageSelectSong = {
+  bpm: 150,
+  loop: true,
+  tracks: [
+    {
+      wave: 0.5,
+      volume: 0.08,
+      decay: 0.35,
+      notes: parseMelody(`
+        C5:2 E5:2 G5:2 C6:2 B5:2 G5:2 E5:2 D5:2
+        A4:2 C5:2 E5:2 A5:2 G5:2 E5:2 C5:2 B4:2
+        F4:2 A4:2 C5:2 F5:2 E5:2 C5:2 A4:2 G4:2
+        G4:2 B4:2 D5:2 G5:4 F5:2 D5:2 B4:2
+        E5:4 G5:4 C6:4 G5:4
+        A5:4 E5:4 C5:4 E5:4
+        F5:4 A5:4 G5:2 F5:2 E5:2 D5:2
+        D5:8 G5:4 .:4
+      `),
+    },
+    {
+      wave: 0.125,
+      volume: 0.04,
+      notes: arpeggioTrack(selectChords, 16, [0, 1, 2, 3]),
+    },
+    {
+      wave: 'tri',
+      volume: 0.2,
+      notes: bassTrack(selectChords, 16),
+    },
+    {
+      wave: 'noise',
+      volume: 0.09,
+      notes: drumTrack(8, 'k h h h s h k h k h k h s h h h'),
     },
   ],
 };

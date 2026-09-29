@@ -47,6 +47,8 @@ const player = {
   teleport: null,
   wasOnGround: false,
   frame: 0,
+  weapon: 'buster',
+  iceVx: 0,
 };
 
 // FUNCTIONS
@@ -79,6 +81,8 @@ function resetPlayer(x, y) {
     teleport: null,
     wasOnGround: true,
     frame: 0,
+    weapon: 'buster',
+    iceVx: 0,
   });
 }
 
@@ -310,7 +314,14 @@ function updatePlayerControl() {
     return;
   }
 
-  if (dir !== 0) {
+  if (player.onGround && standingOnIce(player)) {
+    if (dir !== 0) player.facing = dir;
+    const target = dir * playerStats.walkSpeed;
+    const step = 0.04;
+    player.iceVx = player.iceVx < target ? Math.min(target, player.iceVx + step) : Math.max(target, player.iceVx - step);
+    player.stepTimer = dir !== 0 ? 8 : 0;
+    if (moveBody(player, player.iceVx, 0).hitWall) player.iceVx = 0;
+  } else if (dir !== 0) {
     player.facing = dir;
     if (player.onGround) {
       player.stepTimer++;
@@ -321,8 +332,10 @@ function updatePlayerControl() {
       player.stepTimer = 8;
       moveBody(player, dir * playerStats.walkSpeed, 0);
     }
+    player.iceVx = player.stepTimer >= 8 ? dir * playerStats.walkSpeed : 0;
   } else {
     player.stepTimer = 0;
+    if (player.onGround) player.iceVx = 0;
   }
 
   if (player.onGround && input.pressed.jump) {
@@ -355,6 +368,10 @@ function applyPlayerGravity() {
 }
 
 function handleShooting() {
+  if (player.weapon !== 'buster') {
+    if (input.pressed.fire && !player.sliding) fireSpecialWeapon();
+    return;
+  }
   if (player.sliding) {
     if (input.held.fire) player.charge++;
     else releaseCharge();
@@ -393,8 +410,15 @@ function updatePlayer() {
   }
   if (player.invulnTimer > 0) player.invulnTimer--;
   if (player.shootTimer > 0) player.shootTimer--;
-  if (player.control) updatePlayerControl();
-  else if (!player.climbing) applyPlayerGravity();
+  if (player.control) {
+    if (input.pressed.select || input.pressed.next) cycleWeapon(1);
+    else if (input.pressed.prev) cycleWeapon(-1);
+    updatePlayerControl();
+  } else if (!player.climbing) applyPlayerGravity();
+  if (player.control && player.invulnTimer === 0 && touchingSpikes(player)) {
+    killPlayer(false);
+    return;
+  }
   choosePlayerPose();
 }
 
@@ -408,12 +432,13 @@ function autoWalk(dx) {
 
 function choosePlayerPose() {
   const shooting = player.shootTimer > 0;
+  const action = player.weapon === 'buster' ? 'Shoot' : 'Throw';
   if (player.hurtTimer > 0) {
     player.pose = 'megaHurt';
     return;
   }
   if (player.climbing) {
-    if (shooting) player.pose = 'megaClimbShoot';
+    if (shooting) player.pose = 'megaClimb' + action;
     else if (!ladderAt(player.x, player.y - 20) && ladderAt(player.x, player.y - 1)) player.pose = 'megaClimbTop';
     else player.pose = 'megaClimb';
     return;
@@ -423,23 +448,23 @@ function choosePlayerPose() {
     return;
   }
   if (!player.onGround) {
-    player.pose = shooting ? 'megaJumpShoot' : 'megaJump';
+    player.pose = shooting ? 'megaJump' + action : 'megaJump';
     return;
   }
   const moving = input.held.left !== input.held.right && player.control;
   if (moving && player.stepTimer >= 8) {
     player.runTimer++;
     const index = 1 + (Math.floor(player.runTimer / 7) % 4);
-    player.pose = (shooting ? 'megaRunShoot' : 'megaRun') + index;
+    player.pose = (shooting ? 'megaRun' + action : 'megaRun') + index;
     return;
   }
   player.runTimer = 0;
   if (moving) {
-    player.pose = shooting ? 'megaShoot' : 'megaStep';
+    player.pose = shooting ? 'mega' + action : 'megaStep';
     return;
   }
   if (shooting) {
-    player.pose = 'megaShoot';
+    player.pose = 'mega' + action;
     return;
   }
   player.blinkTimer++;
@@ -449,7 +474,7 @@ function choosePlayerPose() {
 function playerPalette() {
   if (player.charge >= playerStats.chargeFull) return ['megaCharge2', 'megaCharge3', 'mega'][Math.floor(player.frame / 2) % 3];
   if (player.charge >= playerStats.chargeMid) return Math.floor(player.frame / 4) % 2 ? 'megaCharge1' : 'mega';
-  return 'mega';
+  return weaponDefs[player.weapon].palette;
 }
 
 function drawPlayer(ctx) {
