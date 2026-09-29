@@ -17,6 +17,10 @@ const playerStats = {
   shootPoseFrames: 18,
   chargeMid: 30,
   chargeFull: 90,
+  waterGravity: 0.14,
+  waterMaxFall: 3.2,
+  slowScale: 0.5,
+  slowJumpScale: 0.8,
 };
 
 const player = {
@@ -49,6 +53,12 @@ const player = {
   frame: 0,
   weapon: 'buster',
   iceVx: 0,
+  platform: null,
+  inWater: false,
+  pushX: 0,
+  slowTimer: 0,
+  shieldTimer: 0,
+  bubbleTimer: 0,
 };
 
 // FUNCTIONS
@@ -83,6 +93,12 @@ function resetPlayer(x, y) {
     frame: 0,
     weapon: 'buster',
     iceVx: 0,
+    platform: null,
+    inWater: false,
+    pushX: 0,
+    slowTimer: 0,
+    shieldTimer: 0,
+    bubbleTimer: 0,
   });
 }
 
@@ -158,7 +174,7 @@ function fireBuster(kind) {
 }
 
 function hurtPlayer(damage) {
-  if (player.dead || player.invulnTimer > 0 || player.teleport || !player.control) return;
+  if (player.dead || player.invulnTimer > 0 || player.shieldTimer > 0 || player.teleport || !player.control) return;
   player.health = Math.max(0, player.health - damage);
   if (player.health <= 0) {
     killPlayer(false);
@@ -192,6 +208,7 @@ function killPlayer(fromPit) {
 
 function startClimb(ladderCol) {
   player.climbing = true;
+  player.platform = null;
   player.sliding = false;
   player.h = playerStats.standHeight;
   player.x = ladderCol * tileSize + tileSize / 2;
@@ -270,8 +287,28 @@ function startSlide() {
   spawnEffect('dust', player.x - player.facing * 8, player.y);
 }
 
+function playerSlowed() {
+  return player.slowTimer > 0 || (player.onGround && standingOnSlow(player));
+}
+
+function playerWalkSpeed() {
+  return playerStats.walkSpeed * (playerSlowed() ? playerStats.slowScale : 1);
+}
+
+function playerJumpSpeed() {
+  return playerStats.jumpSpeed * (playerSlowed() ? playerStats.slowJumpScale : 1);
+}
+
+function applyPlayerPush() {
+  if (player.onGround) player.pushX += conveyorUnder(player) * 0.75;
+  if (player.pushX && !player.climbing) moveBody(player, player.pushX, 0);
+  player.pushX = 0;
+}
+
 function updatePlayerControl() {
   const dir = (input.held.right ? 1 : 0) - (input.held.left ? 1 : 0);
+  const weaponDef = weaponDefs[player.weapon];
+  if (weaponDef.controlPlayer && weaponDef.controlPlayer()) return;
 
   if (player.hurtTimer > 0) {
     player.hurtTimer--;
@@ -293,7 +330,7 @@ function updatePlayerControl() {
     const blocked = boxBlockedAbove(player.x, player.y, player.w, playerStats.standHeight);
     if (input.pressed.jump && !blocked && !input.held.down) {
       endSlide();
-      player.vy = -playerStats.jumpSpeed;
+      player.vy = -playerJumpSpeed();
       player.onGround = false;
     } else {
       player.slideTimer--;
@@ -314,9 +351,10 @@ function updatePlayerControl() {
     return;
   }
 
+  const walkSpeed = playerWalkSpeed();
   if (player.onGround && standingOnIce(player)) {
     if (dir !== 0) player.facing = dir;
-    const target = dir * playerStats.walkSpeed;
+    const target = dir * walkSpeed;
     const step = 0.04;
     player.iceVx = player.iceVx < target ? Math.min(target, player.iceVx + step) : Math.max(target, player.iceVx - step);
     player.stepTimer = dir !== 0 ? 8 : 0;
@@ -327,20 +365,21 @@ function updatePlayerControl() {
       player.stepTimer++;
       if (player.stepTimer === 1) moveBody(player, dir, 0);
       else if (player.stepTimer < 8) moveBody(player, dir * 0.125, 0);
-      else moveBody(player, dir * playerStats.walkSpeed, 0);
+      else moveBody(player, dir * walkSpeed, 0);
     } else {
       player.stepTimer = 8;
-      moveBody(player, dir * playerStats.walkSpeed, 0);
+      moveBody(player, dir * walkSpeed, 0);
     }
-    player.iceVx = player.stepTimer >= 8 ? dir * playerStats.walkSpeed : 0;
+    player.iceVx = player.stepTimer >= 8 ? dir * walkSpeed : 0;
   } else {
     player.stepTimer = 0;
     if (player.onGround) player.iceVx = 0;
   }
 
   if (player.onGround && input.pressed.jump) {
-    player.vy = -playerStats.jumpSpeed;
+    player.vy = -playerJumpSpeed();
     player.onGround = false;
+    player.platform = null;
   }
   if (player.vy < 0 && !input.held.jump) player.vy = 0;
 
@@ -355,10 +394,23 @@ function endSlide() {
 }
 
 function applyPlayerGravity() {
-  player.vy = Math.min(player.vy + playerStats.gravity, playerStats.maxFall);
+  const gravity = player.inWater ? playerStats.waterGravity : playerStats.gravity;
+  const maxFall = player.inWater ? playerStats.waterMaxFall : playerStats.maxFall;
+  player.vy = Math.min(player.vy + gravity, maxFall);
+  const previousBottom = player.y;
   const result = moveBody(player, 0, player.vy);
   if (result.hitCeiling) player.vy = 0;
-  if (result.landed) {
+  let landed = result.landed;
+  player.platform = null;
+  if (!landed && player.vy >= 0) {
+    const platform = platformLanding(player, previousBottom);
+    if (platform) {
+      player.y = platform.y;
+      player.platform = platform;
+      landed = true;
+    }
+  }
+  if (landed) {
     if (!player.onGround && player.vy > 1) playSfx('land');
     player.onGround = true;
     player.vy = 0;
@@ -367,9 +419,25 @@ function applyPlayerGravity() {
   }
 }
 
+function updateWaterState() {
+  const wasInWater = player.inWater;
+  player.inWater = isWaterAt(player.x, player.y - 12);
+  if (player.inWater !== wasInWater && player.vy > 1) spawnEffect('splash', player.x, Math.floor((player.y - 4) / tileSize) * tileSize);
+  if (!player.inWater) return;
+  player.bubbleTimer++;
+  if (player.bubbleTimer % 50 === 0 && isWaterAt(player.x, player.y - 26)) spawnEffect('bubble', player.x + player.facing * 4, player.y - 22);
+}
+
 function handleShooting() {
   if (player.weapon !== 'buster') {
-    if (input.pressed.fire && !player.sliding) fireSpecialWeapon();
+    const def = weaponDefs[player.weapon];
+    if (player.sliding) return;
+    if (input.pressed.fire && game.weaponEnergy[player.weapon] >= def.cost && def.fire()) {
+      game.weaponEnergy[player.weapon] -= def.cost;
+      if (!def.noPose) player.shootTimer = playerStats.shootPoseFrames;
+      stageEvents.playerFired = true;
+    }
+    if (def.whileFireHeld && input.held.fire) def.whileFireHeld();
     return;
   }
   if (player.sliding) {
@@ -409,16 +477,23 @@ function updatePlayer() {
     return;
   }
   if (player.invulnTimer > 0) player.invulnTimer--;
+  if (player.shieldTimer > 0) player.shieldTimer--;
+  if (player.slowTimer > 0) player.slowTimer--;
   if (player.shootTimer > 0) player.shootTimer--;
+  updateWaterState();
   if (player.control) {
     if (input.pressed.select || input.pressed.next) cycleWeapon(1);
     else if (input.pressed.prev) cycleWeapon(-1);
     updatePlayerControl();
+    applyPlayerPush();
   } else if (!player.climbing) applyPlayerGravity();
-  if (player.control && player.invulnTimer === 0 && touchingSpikes(player)) {
+  if (player.climbing) player.platform = null;
+  player.pushX = 0;
+  if (player.control && player.invulnTimer === 0 && player.shieldTimer === 0 && touchingSpikes(player)) {
     killPlayer(false);
     return;
   }
+  if (player.control && touchingHazard(player)) hurtPlayer(currentStage.hazardDamage || 4);
   choosePlayerPose();
 }
 
@@ -432,7 +507,13 @@ function autoWalk(dx) {
 
 function choosePlayerPose() {
   const shooting = player.shootTimer > 0;
-  const action = player.weapon === 'buster' ? 'Shoot' : 'Throw';
+  const weaponDef = weaponDefs[player.weapon];
+  const action = weaponDef.pose || 'Throw';
+  const special = weaponDef.playerPose && weaponDef.playerPose();
+  if (special) {
+    player.pose = special;
+    return;
+  }
   if (player.hurtTimer > 0) {
     player.pose = 'megaHurt';
     return;
@@ -486,6 +567,8 @@ function drawPlayer(ctx) {
   if (player.pose === 'megaClimb') flip = Math.floor(player.climbStep / 10) % 2 === 1;
   if (player.pose === 'megaClimbTop' || player.pose === 'megaBeam' || player.pose.startsWith('megaTeleport')) flip = false;
   drawSprite(ctx, player.pose, screenX, screenY, flip, playerPalette());
+  const weaponDef = weaponDefs[player.weapon];
+  if (weaponDef.drawPlayer) weaponDef.drawPlayer(ctx, screenX, screenY);
   if (player.hurtTimer > 0) {
     if (player.hurtTimer > 16 && Math.floor(player.hurtTimer / 2) % 2 === 0) drawSprite(ctx, 'megaHitStar', screenX, screenY - 12, false, 'enemy');
     const sweat = 'megaSweat' + (1 + (Math.floor((playerStats.hurtFrames - player.hurtTimer) / 6) % 3));

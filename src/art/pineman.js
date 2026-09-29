@@ -195,3 +195,7 @@ for (let i = 0; i < 4; i++) {
   pineArt['cone' + i] = { ox: Math.floor(width / 2), oy: Math.floor(coneFrame.length / 2), rows: coneFrame };
   coneFrame = rotateArt(coneFrame);
 }
+
+// INITIALIZATION
+
+registerArt(pineArt, 'boss');

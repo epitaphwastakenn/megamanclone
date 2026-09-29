@@ -109,7 +109,6 @@ bossDefs.timber = {
   contactDamage: 4,
   invulnFrames: 20,
   orbPalette: 'orbBoss',
-  damage: { axe: 0, cone: 7, needle: 3 },
   portrait: 'timberFace',
   present: { fall: 'timberJump', land: 'timberStand', pose: 'timberPose' },
   spawn: timberSpawn,

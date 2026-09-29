@@ -319,3 +319,7 @@ for (let i = 0; i < 4; i++) {
   spinFrame = rotateArt(spinFrame);
   smallFrame = rotateArt(smallFrame);
 }
+
+// INITIALIZATION
+
+registerArt(bossArt, 'boss');

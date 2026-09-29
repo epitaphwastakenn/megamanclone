@@ -30,10 +30,9 @@ function buildTimberStage() {
   a.spawn('blader', 34, 6);
   a.spawn('screw', 44, 11);
   a.spawn('bigEye', 59, 12);
-  a.spawn('met', 67, 10);
-  a.spawn('met', 76, 12);
   a.item('energySmall', 19, 8);
   a.item('energyBig', 46, 11);
+  a.item('energySmall', 76, 12);
 
   const b1 = paintRoom('B1');
   b1.fill(0, 0, 2, 15, 'M');
@@ -45,9 +44,8 @@ function buildTimberStage() {
   b1.ladder(7, 6, 9);
   b1.ladder(3, 0, 5);
   b1.back(2, 0, 12, 15, 'b');
-  b1.spawn('blaster', 2, 8, { facing: 1 });
-  b1.spawn('blaster', 14, 3, { facing: -1 });
-  b1.spawn('screw', 12, 10);
+  b1.spawn('blader', 12, 2);
+  b1.item('energySmall', 12, 10);
 
   const b2 = paintRoom('B2');
   b2.fill(0, 0, 2, 15, 'M');
@@ -58,9 +56,9 @@ function buildTimberStage() {
   b2.ladder(3, 11, 14);
   b2.ladder(12, 0, 6);
   b2.back(2, 0, 12, 15, 'b');
-  b2.spawn('blader', 9, 4);
-  b2.spawn('blaster', 2, 5, { facing: 1 });
-  b2.item('weaponSmall', 10, 9);
+  b2.spawn('met', 10, 9);
+  b2.spawn('blader', 13, 1);
+  b2.item('weaponSmall', 13, 7);
 
   const c = paintRoom('C');
   c.fill(0, 0, 2, 15, 'M');
@@ -81,9 +79,6 @@ function buildTimberStage() {
   c.spawn('blader', 24, 5);
   c.spawn('blader', 29, 4);
   c.spawn('screw', 42, 8);
-  c.spawn('met', 46, 12);
-  c.spawn('blader', 51, 6);
-  c.spawn('met', 62, 12);
   c.spawn('met', 70, 12);
   c.spawn('blader', 74, 5);
   c.item('energyBig', 37, 10);

@@ -361,3 +361,40 @@ const tileArt = {
     ],
   },
 };
+
+const commonArt = {
+  bubble: { ox: 2, oy: 2, rows: ['.WW.', 'W..W', 'W..W', '.WW.'] },
+  splash0: {
+    rows: [
+      '......W..W......',
+      '...W..W..W..W...',
+      '....W.aWWa.W....',
+      '..WWaaaaaaaaWW..',
+    ],
+  },
+  splash1: {
+    rows: [
+      '....W......W....',
+      '.....W....W.....',
+      '..W...W..W...W..',
+      '...W..aWWa..W...',
+      '....aa.aa.aa....',
+      '.WWaaaaaaaaaaWW.',
+    ],
+  },
+  splash2: {
+    rows: [
+      '..W..........W..',
+      '................',
+      '.W....W..W....W.',
+      '................',
+      '...a..........a.',
+      '..a.a..aa..a.a..',
+    ],
+  },
+};
+
+// INITIALIZATION
+
+registerArt(tileArt, 'enemy');
+registerArt(commonArt, 'enemy');

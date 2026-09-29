@@ -3098,3 +3098,12 @@ const tileArtOriginals = {
     ],
   },
 };
+
+// INITIALIZATION
+
+registerArt(megaArtOriginals, 'mega');
+registerArt(selectArtOriginals, 'mega');
+registerArt(effectArtOriginals, 'enemy');
+registerArt(itemArtOriginals, 'enemy');
+registerArt(enemyArtOriginals, 'enemy');
+registerArt(tileArtOriginals, 'enemy');

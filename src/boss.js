@@ -3,8 +3,17 @@
 const bossDefs = {};
 const bossShots = [];
 const bossShotKinds = {};
-const bossBaseDamage = { pellet: 2, mid: 3, full: 5, axe: 2, cone: 2, needle: 1 };
 const bossMaxHealth = 28;
+const weaknessChart = {
+  timber: 'swordfish',
+  pine: 'timber',
+  balloon: 'pine',
+  campfire: 'balloon',
+  hive: 'campfire',
+  grizzly: 'hive',
+  angler: 'grizzly',
+  swordfish: 'angler',
+};
 
 const boss = {
   active: false,
@@ -97,13 +106,26 @@ function updateBoss(allowContact) {
   } else if (boss.state === 'pose') {
     boss.timer++;
     bossFacePlayer();
+    if (boss.def.updatePose) boss.def.updatePose(boss);
   } else if (boss.state === 'fight') {
     boss.def.update(boss);
   } else if (boss.state === 'idle') {
     bossPhysics();
   }
   updateBossShots();
-  if (allowContact && boss.visible && !player.dead && boxesOverlap(bodyBox(boss), playerHitBox())) hurtPlayer(boss.def.contactDamage);
+  const contact = boss.def.contactBox ? boss.def.contactBox(boss) : bossBox();
+  if (allowContact && boss.visible && boss.state !== 'dead' && !player.dead && contact && boxesOverlap(contact, playerHitBox())) hurtPlayer(boss.def.contactDamage);
+}
+
+function spawnBossShot(kind, x, y, extra) {
+  const shot = { kind, x, y, vx: 0, vy: 0, age: 0, ...(extra || {}) };
+  bossShots.push(shot);
+  return shot;
+}
+
+function bossShotBox(shot, kind) {
+  if (kind.box) return kind.box(shot);
+  return centerBox(shot.x, shot.y, kind.w || kind.size, kind.h || kind.size);
 }
 
 function updateBossShots() {
@@ -111,28 +133,48 @@ function updateBossShots() {
     const shot = bossShots[i];
     shot.age++;
     const kind = bossShotKinds[shot.kind];
-    if (!kind.update(shot) || !onScreen(shot.x, shot.y, 48)) {
+    if (shot.dead || !kind.update(shot) || shot.dead || (!kind.keepOffscreen && !onScreen(shot.x, shot.y, 48))) {
+      if (kind.onRemove) kind.onRemove(shot);
       bossShots.splice(i, 1);
       continue;
     }
-    if (!player.dead && boxesOverlap(centerBox(shot.x, shot.y, kind.size, kind.size), playerHitBox())) {
+    if (kind.harmless || !kind.damage) continue;
+    if (!player.dead && boxesOverlap(bossShotBox(shot, kind), playerHitBox())) {
+      const wasHurt = player.invulnTimer > 0 || player.shieldTimer > 0;
       hurtPlayer(kind.damage);
-      if (kind.fragile) bossShots.splice(i, 1);
+      if (kind.onHitPlayer) kind.onHitPlayer(shot, wasHurt);
+      if (kind.fragile && !wasHurt) {
+        if (kind.onRemove) kind.onRemove(shot);
+        bossShots.splice(i, 1);
+      }
     }
   }
 }
 
-function bossDamageFor(kind) {
-  const table = boss.def.damage;
-  return kind in table ? table[kind] : bossBaseDamage[kind];
+function bossBox() {
+  return boss.def.box ? boss.def.box(boss) : bodyBox(boss);
+}
+
+function bossDamageFor(shot) {
+  const def = boss.def;
+  if (def.damage && shot.kind in def.damage) return def.damage[shot.kind];
+  const kind = playerShotKinds[shot.kind];
+  const weapon = shot.weapon || 'buster';
+  if (weapon === def.weapon) return 0;
+  if (weapon === weaknessChart[boss.id] && kind.weakDamage !== undefined) return kind.weakDamage;
+  return kind.bossDamage !== undefined ? kind.bossDamage : shot.damage;
 }
 
 function hitBossWithShot(shot, box) {
   if (!boss.active || !boss.visible || boss.state !== 'fight') return false;
-  if (!boxesOverlap(box, bodyBox(boss))) return false;
-  const damage = bossDamageFor(shot.kind);
+  if (!boxesOverlap(box, bossBox())) return false;
+  if (boss.def.shielded && boss.def.shielded(boss, shot)) {
+    reflectShot(shot);
+    return 'reflect';
+  }
+  const damage = bossDamageFor(shot);
   if (damage <= 0) {
-    if (shot.kind === 'needle') {
+    if (playerShotKinds[shot.kind].immuneResult === 'consume') {
       playSfx('tink');
       return 'consumed';
     }
@@ -143,14 +185,20 @@ function hitBossWithShot(shot, box) {
   boss.health = Math.max(0, boss.health - damage);
   boss.invuln = boss.def.invulnFrames;
   spawnEffect('hitSpark', shot.x, shot.y);
+  const weak = (shot.weapon || 'buster') === weaknessChart[boss.id];
   if (boss.health <= 0) defeatBoss();
-  else playSfx('enemyHit');
+  else {
+    playSfx('enemyHit');
+    if (weak && boss.def.onWeakHit) boss.def.onWeakHit(boss, shot);
+    if (boss.def.onHit) boss.def.onHit(boss, shot, weak);
+  }
   return 'hit';
 }
 
 function defeatBoss() {
   boss.state = 'dead';
   boss.visible = false;
+  if (boss.def.onDefeat) boss.def.onDefeat(boss);
   bossShots.length = 0;
   spawnDeathOrbs(boss.x, boss.y - 14, boss.def.orbPalette);
   stopSong();
@@ -160,9 +208,14 @@ function defeatBoss() {
 
 function drawBoss(ctx) {
   if (!boss.active) return;
+  const behind = bossShots.filter(shot => bossShotKinds[shot.kind].behind);
+  for (const shot of behind) bossShotKinds[shot.kind].draw(ctx, shot, shot.x - camera.x, shot.y - camera.y);
   if (boss.visible && !(boss.invuln > 0 && Math.floor(boss.invuln / 2) % 2 === 0)) {
     const shake = boss.ai.shake ? (Math.floor(boss.ai.shake / 2) % 2 ? 1 : -1) : 0;
-    drawSprite(ctx, boss.def.sprite(boss), boss.x - camera.x + shake, boss.y - camera.y, boss.facing < 0, 'boss');
+    const sx = boss.x - camera.x + shake;
+    const sy = boss.y - camera.y;
+    if (boss.def.draw) boss.def.draw(ctx, boss, sx, sy);
+    else drawSprite(ctx, boss.def.sprite(boss), sx, sy, boss.facing < 0, boss.def.palette || 'boss');
   }
-  for (const shot of bossShots) bossShotKinds[shot.kind].draw(ctx, shot, shot.x - camera.x, shot.y - camera.y);
+  for (const shot of bossShots) if (!bossShotKinds[shot.kind].behind) bossShotKinds[shot.kind].draw(ctx, shot, shot.x - camera.x, shot.y - camera.y);
 }
