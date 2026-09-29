@@ -92,7 +92,7 @@ async function runScript() {
   for (const step of script.steps) {
     if (step.hold) await page.evaluate(names => debugHold(names), step.hold);
     if (step.tap) await page.evaluate(names => debugTap(names), step.tap);
-    if (step.eval) console.log('eval:', JSON.stringify(await page.evaluate(step.eval)));
+    if (step.eval) console.log('eval:', JSON.stringify(await page.evaluate('(' + step.eval + ')()')));
     if (step.frames) {
       const chunk = step.every || step.frames;
       for (let done = 0; done < step.frames; done += chunk) {
